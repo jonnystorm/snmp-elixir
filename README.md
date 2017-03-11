@@ -20,7 +20,7 @@ interaction in existence, but we still need worthy SNMP support.
 ## What I'm currently stuck on
 
   * Getting SNMPv3 USM to work (shit is hard)
-  * USM engineID discovery (a la [RFC 3414](https://tools.ietf.org/html/rfc3414#section-4)
+  * USM engineID discovery (a la [RFC 3414](https://tools.ietf.org/html/rfc3414#section-4))
 
 ## TODO
 
