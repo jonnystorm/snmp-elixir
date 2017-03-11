@@ -1,0 +1,3 @@
+%{"jds_math_ex": {:git, "https://github.com/jonnystorm/jds-math-elixir", "10d5cdf175b6a12b5ca9d97e4cb998e3324d6561", []},
+  "linear_ex": {:git, "https://github.com/jonnystorm/linear-elixir", "a6a3dd8889d921878e8c01268fbad7714c599bd0", []},
+  "netaddr_ex": {:git, "https://github.com/jonnystorm/netaddr-elixir", "5afe3431fcdf8fcda5416fb1865d3888167ca251", []}}
