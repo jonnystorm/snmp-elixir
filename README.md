@@ -26,8 +26,10 @@ interaction in existence, but we still need worthy SNMP support.
 
   * SNMPv3 USM
   * SNMP tables
-  * Basic SNMP operations
-  * Make it decent
+  * MIB name resolution
+  * Basic SNMP operations
+  * Process management
+  * Make it decent
 
 ## Installation
 
