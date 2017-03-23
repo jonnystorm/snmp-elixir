@@ -19,17 +19,17 @@ interaction in existence, but we still need worthy SNMP support.
 
 ## What I'm currently stuck on
 
-  * Getting SNMPv3 USM to work (shit is hard)
-  * USM engineID discovery (a la [RFC 3414](https://tools.ietf.org/html/rfc3414#section-4))
+* Getting SNMPv3 USM to work (shit is hard)
+* USM engineID discovery (a la [RFC 3414](https://tools.ietf.org/html/rfc3414#section-4))
 
 ## TODO
 
-  * SNMPv3 USM
-  * SNMP tables
-  * MIB name resolution
-  * Basic SNMP operations
-  * Process management
-  * Make it decent
+* SNMPv3 USM
+* SNMP tables
+* MIB name resolution
+* Basic SNMP operations
+* Process management
+* Make it decent
 
 ## Installation
 
