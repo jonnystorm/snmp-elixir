@@ -198,7 +198,10 @@ defmodule SNMP do
   end
 
   def get(objects, agent, credential, context \\ "")
-  def get(objects, agent, credential, context) when is_list objects do
+  def get([h|_] = objects, agent, credential, context)
+      when is_binary(h)
+        or is_list(h)
+  do
     perform_snmp_op(:get, objects, agent, credential, context)
   end
 
@@ -280,11 +283,14 @@ defmodule SNMP do
     :crypto.hash(algorithm, "#{key}#{engine_id}#{key}")
   end
 
-  defp convert_password_to_key(password, algorithm) do
-    # Per RFC 2274, except use of localEngineID
+  def convert_password_to_key(password, algorithm, engine_id \\ nil)
+  def convert_password_to_key(password, algorithm, engine_id) do
+    # Per RFC 3414, except use of localEngineID
+    eid = engine_id || get_local_engine_id()
+
     password
       |> convert_password_to_intermediate_key(algorithm)
-      |> localize_key(algorithm, get_local_engine_id())
+      |> localize_key(algorithm, eid)
       |> :binary.bin_to_list
   end
 
