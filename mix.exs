@@ -4,12 +4,18 @@ defmodule SNMP.Mixfile do
   def project do
     [ app: :snmp_ex,
       version: "0.1.1",
-      elixir: "~> 1.4",
+      elixir: "~> 1.3",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
       deps: deps(),
       dialyzer: [
-        plt_add_apps: [:snmp],
+        plt_add_apps: [
+          :logger,
+          :snmp,
+          :netaddr_ex,
+          :jds_math_ex,
+          :linear_ex,
+        ],
         ignore_warnings: "dialyzer.ignore",
         flags: [
           :unmatched_returns,
@@ -26,7 +32,7 @@ defmodule SNMP.Mixfile do
   # Type "mix help compile.app" for more information
   def application do
     # Specify extra applications you'll use from Erlang/Elixir
-    [extra_applications: [:logger]]
+    [extra_applications: [:logger, :netaddr_ex]]
   end
 
   # Dependencies can be Hex packages:
