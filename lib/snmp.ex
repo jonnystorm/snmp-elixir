@@ -7,9 +7,11 @@ defmodule SNMP do
   An SNMP client library for Elixir.
   """
 
-  alias __MODULE__.Credential
+  alias SNMP.{Credential, Utility}
 
   require Logger
+
+  @crypto Application.get_env(:snmp_ex, :crypto_module)
 
   defmodule Credential do
     defstruct [
@@ -61,8 +63,8 @@ defmodule SNMP do
       delimiter = get_delimiter_by_family(family)
 
       addr
-        |> Tuple.to_list
-        |> Enum.join(delimiter)
+      |> Tuple.to_list
+      |> Enum.join(delimiter)
     end
   end
 
@@ -90,8 +92,6 @@ defmodule SNMP do
     do: :transportDomainUdpIpv4
   defp get_transport_from_netaddr(%NetAddr.IPv6{}),
     do: :transportDomainUdpIpv6
-
-  defp get_local_engine_id, do: <<0x8000000006::8*5>>
 
   defp register_usm_user(credential, engine_id) do
     usm_config =
@@ -126,25 +126,25 @@ defmodule SNMP do
 
   defp normalize_to_oids(objects) do
     objects
-      |> Enum.reduce([], fn(object, acc) ->
-        cond do
-          is_list object ->
-            if Enum.all?(object, &is_integer/1) do
-              [object|acc]
-            else
-              acc
-            end
+    |> Enum.reduce([], fn(object, acc) ->
+      cond do
+        is_list object ->
+          if Enum.all?(object, &is_integer/1) do
+            [object|acc]
+          else
+            acc
+          end
 
-          object =~ ~r/^\.?\d(\.\d)+$/ ->
-            [string_oid_to_list(object)|acc]
+        object =~ ~r/^\.?\d(\.\d)+$/ ->
+          [string_oid_to_list(object)|acc]
 
-          true ->
-            dot_dec = resolve_mib_name(object)
+        true ->
+          dot_dec = resolve_mib_name(object)
 
-            [string_oid_to_list(dot_dec)|acc]
-        end
-      end)
-      |> Enum.reverse
+          [string_oid_to_list(dot_dec)|acc]
+      end
+    end)
+    |> Enum.reverse
   end
 
   defp normalize_to_uri(%URI{} = uri), do: uri
@@ -202,7 +202,7 @@ defmodule SNMP do
     target = :binary.bin_to_list :crypto.hash(:sha, "#{uri}#{inspect credential}")
     timeout = get_timeout()
     # TODO: Using RFC 5343 localEngineID: is this acceptable?
-    engine_id = :binary.bin_to_list(get_local_engine_id())
+    engine_id = :binary.bin_to_list(Utility.get_local_engine_id())
     cred_list = Map.to_list credential
 
     if cred_list[:sec_model] == :usm do
@@ -239,6 +239,91 @@ defmodule SNMP do
 
   @doc """
   Returns a keyword list containing the given SNMPv1/2c/3 credentials.
+
+  ## Example
+
+    iex> SNMP.credential([:v1, "public"])
+    %SNMP.Credential{version: :v1, sec_model: :v1, community: 'public'}
+
+    iex> SNMP.credential([:v2c, "public"])
+    %SNMP.Credential{version: :v2, sec_model: :v2c, community: 'public'}
+
+    iex> SNMP.credential([:v3, :no_auth_no_priv, "user"])
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :noAuthNoPriv,
+      sec_name:  'user'
+    }
+
+    iex> SNMP.credential([:v3, :auth_no_priv, "user", :md5, "authpass"])
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authNoPriv,
+      sec_name:  'user',
+      auth:      :usmHMACMD5AuthProtocol,
+      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+    }
+
+    iex> SNMP.credential([:v3, :auth_no_priv, "user", :sha, "authpass"])
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authNoPriv,
+      sec_name:  'user',
+      auth:      :usmHMACSHAAuthProtocol,
+      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+    }
+
+    iex> SNMP.credential([:v3, :auth_priv, "user", :md5, "authpass", :des, "privpass"])
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authPriv,
+      sec_name:  'user',
+      auth:      :usmHMACMD5AuthProtocol,
+      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+      priv:      :usmDESPrivProtocol,
+      priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
+    }
+
+    iex> SNMP.credential([:v3, :auth_priv, "user", :sha, "authpass", :des, "privpass"])
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authPriv,
+      sec_name:  'user',
+      auth:      :usmHMACSHAAuthProtocol,
+      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+      priv:      :usmDESPrivProtocol,
+      priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
+    }
+
+    iex> SNMP.credential([:v3, :auth_priv, "user", :md5, "authpass", :aes, "privpass"])
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authPriv,
+      sec_name:  'user',
+      auth:      :usmHMACMD5AuthProtocol,
+      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+      priv:      :usmAesCfb128Protocol,
+      priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
+    }
+
+    iex> SNMP.credential([:v3, :auth_priv, "user", :sha, "authpass", :aes, "privpass"])
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authPriv,
+      sec_name:  'user',
+      auth:      :usmHMACSHAAuthProtocol,
+      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+      priv:      :usmDESPrivProtocol,
+      priv:      :usmAesCfb128Protocol,
+      priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
+    }
   """
   @spec credential([atom | String.t]) :: Credential.t
   def credential(args) when is_list args do
@@ -262,6 +347,14 @@ defmodule SNMP do
 
   @doc """
   Returns a keyword list containing the given SNMPv1/2c community.
+
+  ## Example
+
+    iex> SNMP.credential(:v1, "public")
+    %SNMP.Credential{version: :v1, sec_model: :v1, community: 'public'}
+
+    iex> SNMP.credential(:v2c, "public")
+    %SNMP.Credential{version: :v2, sec_model: :v2c, community: 'public'}
   """
   @spec credential(:v1 | :v2c, String.t) :: Credential.t
   def credential(version, community)
@@ -282,6 +375,16 @@ defmodule SNMP do
 
   @doc """
   Returns a keyword list containing the given SNMPv3 noAuthNoPriv credentials.
+
+  ## Example
+
+    iex> SNMP.credential(:v3, :no_auth_no_priv, "user")
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :noAuthNoPriv,
+      sec_name:  'user',
+    }
   """
   @spec credential(:v3, :no_auth_no_priv, String.t) :: Credential.t
   def credential(version, sec_level, sec_name)
@@ -294,37 +397,30 @@ defmodule SNMP do
     }
   end
 
-  defp convert_password_to_intermediate_key(password, algorithm)
-      when algorithm in [:md5, :sha]
-  do
-    intermediate_key =
-      password
-        |> :binary.bin_to_list
-        |> Stream.cycle
-        |> Enum.take(1048576)
-
-    :crypto.hash(algorithm, intermediate_key)
-  end
-
-  defp localize_key(key, algorithm, engine_id)
-      when algorithm in [:md5, :sha]
-  do
-    :crypto.hash(algorithm, "#{key}#{engine_id}#{key}")
-  end
-
-  def convert_password_to_key(password, algorithm, engine_id \\ nil)
-  def convert_password_to_key(password, algorithm, engine_id) do
-    # Per RFC 3414, except use of localEngineID
-    eid = engine_id || get_local_engine_id()
-
-    password
-      |> convert_password_to_intermediate_key(algorithm)
-      |> localize_key(algorithm, eid)
-      |> :binary.bin_to_list
-  end
-
   @doc """
   Returns a keyword list containing the given SNMPv3 authNoPriv credentials.
+
+  ## Example
+
+    iex> SNMP.credential(:v3, :auth_no_priv, "user", :md5, "authpass")
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authNoPriv,
+      sec_name:  'user',
+      auth:      :usmHMACMD5AuthProtocol,
+      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+    }
+
+    iex> SNMP.credential(:v3, :auth_no_priv, "user", :sha, "authpass")
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authNoPriv,
+      sec_name:  'user',
+      auth:      :usmHMACSHAAuthProtocol,
+      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+    }
   """
   @spec credential(:v3, :auth_no_priv, String.t, :md5|:sha, String.t) :: Credential.t
   def credential(version, sec_level, sec_name, auth_proto, auth_pass)
@@ -337,7 +433,7 @@ defmodule SNMP do
       sec_level: :authNoPriv,
       sec_name:  :binary.bin_to_list(sec_name),
       auth:      auth_proto_to_snmpm_auth(auth_proto),
-      auth_key:  convert_password_to_key(auth_pass, auth_proto),
+      auth_key:  @crypto.convert_password_to_key(auth_pass, auth_proto),
     }
   end
 
@@ -349,6 +445,56 @@ defmodule SNMP do
 
   @doc """
   Returns `t:Credential.t/0` containing the given SNMPv3 authPriv credentials.
+
+  ## Examples
+
+    iex> SNMP.credential(:v3, :auth_priv, "user", :md5, "authpass", :des, "privpass")
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authPriv,
+      sec_name:  'user',
+      auth:      :usmHMACMD5AuthProtocol,
+      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+      priv:      :usmDESPrivProtocol,
+      priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
+    }
+
+    iex> SNMP.credential(:v3, :auth_priv, "user", :sha, "authpass", :des, "privpass")
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authPriv,
+      sec_name:  'user',
+      auth:      :usmHMACSHAAuthProtocol,
+      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+      priv:      :usmDESPrivProtocol,
+      priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
+    }
+
+    iex> SNMP.credential(:v3, :auth_priv, "user", :md5, "authpass", :aes, "privpass")
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authPriv,
+      sec_name:  'user',
+      auth:      :usmHMACMD5AuthProtocol,
+      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+      priv:      :usmAesCfb128Protocol,
+      priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
+    }
+
+    iex> SNMP.credential(:v3, :auth_priv, "user", :sha, "authpass", :aes, "privpass")
+    %SNMP.Credential{
+      version:   :v3,
+      sec_model: :usm,
+      sec_level: :authPriv,
+      sec_name:  'user',
+      auth:      :usmHMACSHAAuthProtocol,
+      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+      priv:      :usmAesCfb128Protocol,
+      priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
+    }
   """
   @spec credential(:v3, :auth_priv, String.t, :md5|:sha, String.t, :des|:aes, String.t) :: Credential.t
   def credential(version, sec_level, sec_name, auth_proto, auth_pass, priv_proto, priv_pass)
@@ -357,11 +503,11 @@ defmodule SNMP do
        and priv_proto in [:des, :aes]
   do
     # http://erlang.org/doc/man/snmpm.html#register_usm_user-3
-    auth_key = convert_password_to_key(auth_pass, auth_proto)
+    auth_key = @crypto.convert_password_to_key(auth_pass, auth_proto)
     priv_key =
       priv_pass
-        |> convert_password_to_key(auth_proto)
-        |> Enum.slice(0..15)
+      |> @crypto.convert_password_to_key(auth_proto)
+      |> Enum.slice(0..15)
 
     %Credential{
       version:   :v3,
@@ -377,6 +523,11 @@ defmodule SNMP do
 
   @doc """
   Converts `oid` to dot-delimited string.
+
+  ## Example
+
+    iex> SNMP.list_oid_to_string([1,3,6,1,2,1,1,5,0])
+    "1.3.6.1.2.1.1.5.0"
   """
   @spec list_oid_to_string([non_neg_integer]) :: String.t
   def list_oid_to_string(oid) when is_list oid do
@@ -385,11 +536,16 @@ defmodule SNMP do
 
   @doc """
   Converts dot-delimited `oid` string to list.
+
+  ## Example
+
+    iex> SNMP.string_oid_to_list("1.3.6.1.2.1.1.5.0")
+    [1,3,6,1,2,1,1,5,0]
   """
   @spec string_oid_to_list(String.t) :: [non_neg_integer]
   def string_oid_to_list(oid) when is_binary oid do
     oid
-      |> String.split(".", [trim: true])
-      |> Enum.map(&String.to_integer/1)
+    |> String.split(".", [trim: true])
+    |> Enum.map(&String.to_integer/1)
   end
 end

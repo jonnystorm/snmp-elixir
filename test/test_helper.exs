@@ -1,3 +1,3 @@
 ExUnit.start()
 
-ExUnit.configure exclude: [:integrated]
+ExUnit.configure exclude: [:expensive, :integrated]
