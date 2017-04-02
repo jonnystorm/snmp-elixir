@@ -2,12 +2,23 @@ defmodule SNMP.Mixfile do
   use Mix.Project
 
   def project do
-    [app: :snmp_ex,
-     version: "0.1.1",
-     elixir: "~> 1.4",
-     build_embedded: Mix.env == :prod,
-     start_permanent: Mix.env == :prod,
-     deps: deps()]
+    [ app: :snmp_ex,
+      version: "0.1.1",
+      elixir: "~> 1.4",
+      build_embedded: Mix.env == :prod,
+      start_permanent: Mix.env == :prod,
+      deps: deps(),
+      dialyzer: [
+        plt_add_apps: [:snmp],
+        ignore_warnings: "dialyzer.ignore",
+        flags: [
+          :unmatched_returns,
+          :error_handling,
+          :race_conditions,
+          :underspecs,
+        ],
+      ],
+    ]
   end
 
   # Configuration for the OTP application

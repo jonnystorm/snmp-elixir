@@ -4,7 +4,7 @@
 
 defmodule SNMP.MIB do
   @moduledoc """
-  A library for working with SNMP MIBs.
+  Functions for working with SNMP MIBs.
   """
 
   require Logger
@@ -54,22 +54,27 @@ defmodule SNMP.MIB do
   defp get_imports_recursive(mib_names, path) when is_list(mib_names),
     do: _get_imports_recursive(mib_names, path, [])
 
-  defp get_imports_recursive(mib_name, path),
-    do: _get_imports_recursive([mib_name], path, [])
+  @type mib_path :: String.t
+  @type import_path :: String.t
 
-  def compile(mib_file, import_path) do
-    erl_import_path = :binary.bin_to_list import_path
-    erl_mib_file = :binary.bin_to_list mib_file
-    options = [i: [erl_import_path], outdir: erl_import_path]
+  @spec compile(mib_path, import_path) :: {:ok, term} | {:error, :term}
+  def compile(mib_path, import_path) do
+    erl_import_path = :binary.bin_to_list "#{import_path}/"
+    erl_mib_path = :binary.bin_to_list mib_path
+    options = [
+      #:warnings_as_errors,
+      i: [erl_import_path],
+      outdir: erl_import_path,
+    ]
 
-    case :snmpc.compile(erl_mib_file, options) do
+    case :snmpc.compile(erl_mib_path, options) do
       {:error, {:invalid_file, _}} = error ->
-        :ok = Logger.error("Unable to compile invalid file: #{inspect mib_file}")
+        :ok = Logger.error("Unable to compile invalid MIB file: #{inspect mib_path}")
 
         error
 
-      {:error, {:invalid_option, _}} = error -> 
-        :ok = Logger.error("Unable to compile with invalid import path: #{inspect import_path}")
+      {:error, {:invalid_option, option}} = error -> 
+        :ok = Logger.error("Unable to compile MIB with invalid option: #{inspect option}")
 
         error
 
@@ -81,6 +86,7 @@ defmodule SNMP.MIB do
   @doc """
   Compile all .mib files in `mib_path`.
   """
+  @spec compile_all(mib_path) :: [{String.t, {:ok, term} | {:error, term}}]
   def compile_all(mib_path) do
     # This doesn't handle subdirectories; may need to write find/2 later.
     # This doesn't handle a separate list of import paths. Too hard right now.
@@ -90,6 +96,6 @@ defmodule SNMP.MIB do
     |> Enum.map(&Path.basename(&1, ".mib"))
     |> get_imports_recursive(mib_path)
     |> Enum.map(&Path.join(mib_path, "#{&1}.mib"))
-    |> Enum.map(&compile(&1, mib_path))
+    |> Enum.map(&{&1, compile(&1, mib_path)})
   end
 end

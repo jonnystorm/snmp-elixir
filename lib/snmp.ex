@@ -4,17 +4,44 @@
 
 defmodule SNMP do
   @moduledoc """
-  An SNMP client library for Elixir
+  An SNMP client library for Elixir.
   """
-  use GenServer
+
+  alias __MODULE__.Credential
 
   require Logger
 
-  def start do
-    :snmpm.start()
-    :snmpm.register_user(__MODULE__, :snmpm_user_default, self())
+  defmodule Credential do
+    defstruct [
+      :version,
+      :sec_model,
+      :community,
+      :sec_level,
+      :sec_name,
+      :auth,
+      :auth_key,
+      :priv,
+      :priv_key,
+    ]
 
-    GenServer.start(__MODULE__, [])
+    @type t :: %__MODULE__{
+        version: :v1 | :v2 | :v3,
+      sec_model: :v1 | :v2c | :usm,
+      community: nil | [byte],
+      sec_level: nil | :noAuthNoPriv | :authNoPriv | :authPriv,
+       sec_name: nil | [byte],
+           auth: nil | :usmHMACMD5AuthProtocol | :usmHMACSHAAuthProtocol,
+       auth_key: nil | [byte],
+           priv: nil | :usmDESPrivProtocol | :usmAesCfb128Protocol,
+       priv_key: nil | [byte],
+    }
+  end
+
+  def start do
+    :ok = :snmpm.start()
+    :ok = :snmpm.register_user(__MODULE__, :snmpm_user_default, self())
+
+    :ok
   end
 
   defp get_timeout,
@@ -23,20 +50,19 @@ defmodule SNMP do
   defp get_max_repetitions,
     do: Application.get_env(:snmp_ex, :max_repetitions)
 
-  defp gethostbyname(host) do
-    result =
-      host
-        |> :binary.bin_to_list
-        |> :inet.gethostbyname
+  defp get_delimiter_by_family(4), do: "."
+  defp get_delimiter_by_family(6), do: ":"
 
-    with {:ok, {_, _, _, _, family, [addr|_]}} <- result do
-        list = Tuple.to_list addr
+  defp get_host_by_name(host) do
+    result = :inet.gethostbyname :binary.bin_to_list(host)
 
-        delimiter = %{4 => ".", 6 => ":"}[family]
+    with {:ok, {_, _, _, _, family, [addr|_]}} <- result
+    do
+      delimiter = get_delimiter_by_family(family)
 
-        list
-          |> Enum.join(delimiter)
-          |> NetAddr.ip
+      addr
+        |> Tuple.to_list
+        |> Enum.join(delimiter)
     end
   end
 
@@ -52,7 +78,7 @@ defmodule SNMP do
 
   defp resolve_host_to_netaddr(host) do
     with {:error, _} <- parse_ip(host),
-         {:error, _} <- parse_ip(gethostbyname host)
+         {:error, _} <- parse_ip(get_host_by_name host)
     do
       :ok = Logger.error("Unable to resolve host #{inspect host}")
 
@@ -68,14 +94,17 @@ defmodule SNMP do
   defp get_local_engine_id, do: <<0x8000000006::8*5>>
 
   defp register_usm_user(credential, engine_id) do
-    usm_keys = [:sec_name, :auth, :auth_key, :priv, :priv_key]
-    usm_config = Keyword.take(credential, usm_keys)
+    usm_config =
+      credential
+      |> Keyword.take([:sec_name, :auth, :auth_key, :priv, :priv_key])
+      |> Enum.filter(fn {_, v} -> not is_nil(v) end)
 
     :snmpm.register_usm_user(engine_id, usm_config[:sec_name], usm_config)
   end
 
   defp register_agent(target, uri, credential, engine_id) do
-    with {:ok, netaddr} <- resolve_host_to_netaddr(uri.host) do
+    with {:ok, netaddr} <- resolve_host_to_netaddr(uri.host)
+    do
       config = [ engine_id: engine_id,
                    address: NetAddr.netaddr_to_list(netaddr),
                       port: uri.port || 161,
@@ -114,8 +143,8 @@ defmodule SNMP do
 
             [string_oid_to_list(dot_dec)|acc]
         end
-    end)
-    |> Enum.reverse
+      end)
+      |> Enum.reverse
   end
 
   defp normalize_to_uri(%URI{} = uri), do: uri
@@ -174,12 +203,13 @@ defmodule SNMP do
     timeout = get_timeout()
     # TODO: Using RFC 5343 localEngineID: is this acceptable?
     engine_id = :binary.bin_to_list(get_local_engine_id())
+    cred_list = Map.to_list credential
 
-    if credential[:sec_model] == :usm do
-      register_usm_user(credential, engine_id)
+    if cred_list[:sec_model] == :usm do
+      register_usm_user(cred_list, engine_id)
     end
 
-    case register_agent(target, uri, credential, engine_id) do
+    case register_agent(target, uri, cred_list, engine_id) do
       :ok ->
         _perform_snmp_op(op, oids, target, context, timeout)
 
@@ -210,7 +240,7 @@ defmodule SNMP do
   @doc """
   Returns a keyword list containing the given SNMPv1/2c/3 credentials.
   """
-  @spec credential(list) :: Keyword.t
+  @spec credential([atom | String.t]) :: Credential.t
   def credential(args) when is_list args do
     case args do
       [:v1, _] ->
@@ -233,35 +263,35 @@ defmodule SNMP do
   @doc """
   Returns a keyword list containing the given SNMPv1/2c community.
   """
-  @spec credential(:v1, String.t) :: Keyword.t
-  @spec credential(:v2c, String.t) :: Keyword.t
-
+  @spec credential(:v1 | :v2c, String.t) :: Credential.t
   def credential(version, community)
   def credential(:v1, community) do
-    [ version:   :v1,
+    %Credential{
+      version:   :v1,
       sec_model: :v1,
       community: :binary.bin_to_list(community),
-    ]
+    }
   end
   def credential(:v2c, community) do
-    [ version:   :v2,
+    %Credential{
+      version:   :v2,
       sec_model: :v2c,
       community: :binary.bin_to_list(community),
-    ]
+    }
   end
 
   @doc """
   Returns a keyword list containing the given SNMPv3 noAuthNoPriv credentials.
   """
-  @spec credential(:v3, :no_auth_no_priv, String.t) :: Keyword.t
-
+  @spec credential(:v3, :no_auth_no_priv, String.t) :: Credential.t
   def credential(version, sec_level, sec_name)
   def credential(:v3, :no_auth_no_priv, sec_name) do
-    [ version:   :v3,
+    %Credential{
+      version:   :v3,
       sec_model: :usm,
       sec_level: :noAuthNoPriv,
       sec_name:  :binary.bin_to_list(sec_name),
-    ]
+    }
   end
 
   defp convert_password_to_intermediate_key(password, algorithm)
@@ -296,19 +326,19 @@ defmodule SNMP do
   @doc """
   Returns a keyword list containing the given SNMPv3 authNoPriv credentials.
   """
-  @spec credential(:v3, :auth_no_priv, String.t, :md5|:sha, String.t) :: Keyword.t
-
+  @spec credential(:v3, :auth_no_priv, String.t, :md5|:sha, String.t) :: Credential.t
   def credential(version, sec_level, sec_name, auth_proto, auth_pass)
   def credential(:v3, :auth_no_priv, sec_name, auth_proto, auth_pass)
       when auth_proto in [:md5, :sha]
   do
-    [ version:   :v3,
+    %Credential{
+      version:   :v3,
       sec_model: :usm,
       sec_level: :authNoPriv,
       sec_name:  :binary.bin_to_list(sec_name),
       auth:      auth_proto_to_snmpm_auth(auth_proto),
       auth_key:  convert_password_to_key(auth_pass, auth_proto),
-    ]
+    }
   end
 
   defp auth_proto_to_snmpm_auth(:md5), do: :usmHMACMD5AuthProtocol
@@ -318,10 +348,9 @@ defmodule SNMP do
   defp priv_proto_to_snmpm_auth(:aes), do: :usmAesCfb128Protocol
 
   @doc """
-  Returns a keyword list containing the given SNMPv3 authPriv credentials.
+  Returns `t:Credential.t/0` containing the given SNMPv3 authPriv credentials.
   """
-  @spec credential(:v3, :auth_priv, String.t, :md5|:sha, String.t, :des|:aes, String.t) :: Keyword.t
-
+  @spec credential(:v3, :auth_priv, String.t, :md5|:sha, String.t, :des|:aes, String.t) :: Credential.t
   def credential(version, sec_level, sec_name, auth_proto, auth_pass, priv_proto, priv_pass)
   def credential(:v3, :auth_priv, sec_name, auth_proto, auth_pass, priv_proto, priv_pass)
       when auth_proto in [:md5, :sha]
@@ -334,7 +363,8 @@ defmodule SNMP do
         |> convert_password_to_key(auth_proto)
         |> Enum.slice(0..15)
 
-    [ version:   :v3,
+    %Credential{
+      version:   :v3,
       sec_model: :usm,
       sec_level: :authPriv,
       sec_name:  :binary.bin_to_list(sec_name),
@@ -342,14 +372,13 @@ defmodule SNMP do
       auth_key:  auth_key,
       priv:      priv_proto_to_snmpm_auth(priv_proto),
       priv_key:  priv_key,
-    ]
+    }
   end
 
   @doc """
   Converts `oid` to dot-delimited string.
   """
   @spec list_oid_to_string([non_neg_integer]) :: String.t
-
   def list_oid_to_string(oid) when is_list oid do
     Enum.join(oid, ".")
   end
@@ -358,7 +387,6 @@ defmodule SNMP do
   Converts dot-delimited `oid` string to list.
   """
   @spec string_oid_to_list(String.t) :: [non_neg_integer]
-
   def string_oid_to_list(oid) when is_binary oid do
     oid
       |> String.split(".", [trim: true])
