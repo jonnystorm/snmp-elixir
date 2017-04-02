@@ -1,4 +1,4 @@
-defmodule SNMP.MIBTest do
+defmodule SNMP.MIB.Test do
   use ExUnit.Case
   doctest SNMP.MIB
 
