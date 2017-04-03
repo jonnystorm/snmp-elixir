@@ -19,7 +19,9 @@ defmodule SNMP.MIB.Test do
 
   test "Compiles directory of SNMP MIBs (with extension .mib) without errors" do
     results = compile_all @tmp_dir
+    mib_files = Enum.map(results, fn {f, _} -> :binary.bin_to_list(f) end)
 
-    assert Enum.all?(results, fn {_, {a, _}} -> a == :ok end)
+    assert Enum.all?(results, fn {_, {a, _}} -> a == :ok end) == true
+    assert :snmpc.is_consistent(mib_files) == :ok
   end
 end
