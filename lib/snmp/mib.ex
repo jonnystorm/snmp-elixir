@@ -7,6 +7,8 @@ defmodule SNMP.MIB do
   Functions for working with SNMP MIBs.
   """
 
+  alias SNMP.Utility
+
   require Logger
 
   # http://erlang.org/doc/apps/snmp/snmp_mib_compiler.html#id77861
@@ -26,35 +28,25 @@ defmodule SNMP.MIB do
     |> Enum.to_list
   end
 
-  defp _get_imports_recursive([], acc) do
-    acc
-    |> Enum.uniq
-    |> Enum.reverse
-  end
-
+  defp _get_imports_recursive([], acc), do: acc
   defp _get_imports_recursive([mib_file|rest], acc) do
-    # This is a hack. Later, we may need to protect against loops with a
-    # partial ordering structure.
     imports =
       try do
         mib_file
         |> File.stream!
         |> get_imports_from_lines
         |> exclude_builtin_mibs
-        |> Enum.map(&Path.join(Path.dirname(mib_file), "#{&1}.mib"))
+        |> Stream.map(&Path.join(Path.dirname(mib_file), "#{&1}.mib"))
+        |> Enum.map(& {mib_file, &1})
 
       rescue
         File.Error ->
           :ok = Logger.error("Unable to find MIB file: #{inspect mib_file}")
 
-          []
+          [{mib_file, []}]
       end
 
-    if imports == [] do
-      _get_imports_recursive(rest, acc)
-    else
-      _get_imports_recursive(rest, Enum.concat([mib_file|imports], acc))
-    end
+    _get_imports_recursive(rest, Enum.concat(imports, acc))
   end
 
   defp get_imports_recursive(mib_files) when is_list(mib_files),
@@ -100,6 +92,9 @@ defmodule SNMP.MIB do
     end)
   end
 
+  defp convert_imports_to_adjacencies(imports),
+    do: Enum.group_by(imports, &elem(&1, 1), &elem(&1, 0))
+
   @type mib_dir :: String.t
 
   @doc """
@@ -111,6 +106,9 @@ defmodule SNMP.MIB do
     mib_dirs
     |> list_files_with_mib_extension
     |> get_imports_recursive
+    |> convert_imports_to_adjacencies
+    |> Utility.convert_dag_to_strict_poset
+    |> List.flatten
     |> Enum.map(&{&1, compile(&1, mib_dirs)})
   end
 
