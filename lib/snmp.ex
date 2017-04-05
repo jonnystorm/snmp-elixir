@@ -242,88 +242,88 @@ defmodule SNMP do
 
   ## Example
 
-    iex> SNMP.credential([:v1, "public"])
-    %SNMP.Credential{version: :v1, sec_model: :v1, community: 'public'}
+      iex> SNMP.credential([:v1, "public"])
+      %SNMP.Credential{version: :v1, sec_model: :v1, community: 'public'}
 
-    iex> SNMP.credential([:v2c, "public"])
-    %SNMP.Credential{version: :v2, sec_model: :v2c, community: 'public'}
+      iex> SNMP.credential([:v2c, "public"])
+      %SNMP.Credential{version: :v2, sec_model: :v2c, community: 'public'}
 
-    iex> SNMP.credential([:v3, :no_auth_no_priv, "user"])
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :noAuthNoPriv,
-      sec_name:  'user'
-    }
+      iex> SNMP.credential([:v3, :no_auth_no_priv, "user"])
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :noAuthNoPriv,
+        sec_name:  'user'
+      }
 
-    iex> SNMP.credential([:v3, :auth_no_priv, "user", :md5, "authpass"])
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authNoPriv,
-      sec_name:  'user',
-      auth:      :usmHMACMD5AuthProtocol,
-      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
-    }
+      iex> SNMP.credential([:v3, :auth_no_priv, "user", :md5, "authpass"])
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authNoPriv,
+        sec_name:  'user',
+        auth:      :usmHMACMD5AuthProtocol,
+        auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+      }
 
-    iex> SNMP.credential([:v3, :auth_no_priv, "user", :sha, "authpass"])
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authNoPriv,
-      sec_name:  'user',
-      auth:      :usmHMACSHAAuthProtocol,
-      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
-    }
+      iex> SNMP.credential([:v3, :auth_no_priv, "user", :sha, "authpass"])
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authNoPriv,
+        sec_name:  'user',
+        auth:      :usmHMACSHAAuthProtocol,
+        auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+      }
 
-    iex> SNMP.credential([:v3, :auth_priv, "user", :md5, "authpass", :des, "privpass"])
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authPriv,
-      sec_name:  'user',
-      auth:      :usmHMACMD5AuthProtocol,
-      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
-      priv:      :usmDESPrivProtocol,
-      priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
-    }
+      iex> SNMP.credential([:v3, :auth_priv, "user", :md5, "authpass", :des, "privpass"])
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authPriv,
+        sec_name:  'user',
+        auth:      :usmHMACMD5AuthProtocol,
+        auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+        priv:      :usmDESPrivProtocol,
+        priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
+      }
 
-    iex> SNMP.credential([:v3, :auth_priv, "user", :sha, "authpass", :des, "privpass"])
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authPriv,
-      sec_name:  'user',
-      auth:      :usmHMACSHAAuthProtocol,
-      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
-      priv:      :usmDESPrivProtocol,
-      priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
-    }
+      iex> SNMP.credential([:v3, :auth_priv, "user", :sha, "authpass", :des, "privpass"])
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authPriv,
+        sec_name:  'user',
+        auth:      :usmHMACSHAAuthProtocol,
+        auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+        priv:      :usmDESPrivProtocol,
+        priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
+      }
 
-    iex> SNMP.credential([:v3, :auth_priv, "user", :md5, "authpass", :aes, "privpass"])
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authPriv,
-      sec_name:  'user',
-      auth:      :usmHMACMD5AuthProtocol,
-      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
-      priv:      :usmAesCfb128Protocol,
-      priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
-    }
+      iex> SNMP.credential([:v3, :auth_priv, "user", :md5, "authpass", :aes, "privpass"])
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authPriv,
+        sec_name:  'user',
+        auth:      :usmHMACMD5AuthProtocol,
+        auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+        priv:      :usmAesCfb128Protocol,
+        priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
+      }
 
-    iex> SNMP.credential([:v3, :auth_priv, "user", :sha, "authpass", :aes, "privpass"])
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authPriv,
-      sec_name:  'user',
-      auth:      :usmHMACSHAAuthProtocol,
-      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
-      priv:      :usmDESPrivProtocol,
-      priv:      :usmAesCfb128Protocol,
-      priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
-    }
+      iex> SNMP.credential([:v3, :auth_priv, "user", :sha, "authpass", :aes, "privpass"])
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authPriv,
+        sec_name:  'user',
+        auth:      :usmHMACSHAAuthProtocol,
+        auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+        priv:      :usmDESPrivProtocol,
+        priv:      :usmAesCfb128Protocol,
+        priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
+      }
   """
   @spec credential([atom | String.t]) :: Credential.t
   def credential(args) when is_list args do
@@ -350,11 +350,11 @@ defmodule SNMP do
 
   ## Example
 
-    iex> SNMP.credential(:v1, "public")
-    %SNMP.Credential{version: :v1, sec_model: :v1, community: 'public'}
+      iex> SNMP.credential(:v1, "public")
+      %SNMP.Credential{version: :v1, sec_model: :v1, community: 'public'}
 
-    iex> SNMP.credential(:v2c, "public")
-    %SNMP.Credential{version: :v2, sec_model: :v2c, community: 'public'}
+      iex> SNMP.credential(:v2c, "public")
+      %SNMP.Credential{version: :v2, sec_model: :v2c, community: 'public'}
   """
   @spec credential(:v1 | :v2c, String.t) :: Credential.t
   def credential(version, community)
@@ -378,13 +378,13 @@ defmodule SNMP do
 
   ## Example
 
-    iex> SNMP.credential(:v3, :no_auth_no_priv, "user")
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :noAuthNoPriv,
-      sec_name:  'user',
-    }
+      iex> SNMP.credential(:v3, :no_auth_no_priv, "user")
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :noAuthNoPriv,
+        sec_name:  'user',
+      }
   """
   @spec credential(:v3, :no_auth_no_priv, String.t) :: Credential.t
   def credential(version, sec_level, sec_name)
@@ -402,25 +402,25 @@ defmodule SNMP do
 
   ## Example
 
-    iex> SNMP.credential(:v3, :auth_no_priv, "user", :md5, "authpass")
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authNoPriv,
-      sec_name:  'user',
-      auth:      :usmHMACMD5AuthProtocol,
-      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
-    }
+      iex> SNMP.credential(:v3, :auth_no_priv, "user", :md5, "authpass")
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authNoPriv,
+        sec_name:  'user',
+        auth:      :usmHMACMD5AuthProtocol,
+        auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+      }
 
-    iex> SNMP.credential(:v3, :auth_no_priv, "user", :sha, "authpass")
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authNoPriv,
-      sec_name:  'user',
-      auth:      :usmHMACSHAAuthProtocol,
-      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
-    }
+      iex> SNMP.credential(:v3, :auth_no_priv, "user", :sha, "authpass")
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authNoPriv,
+        sec_name:  'user',
+        auth:      :usmHMACSHAAuthProtocol,
+        auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+      }
   """
   @spec credential(:v3, :auth_no_priv, String.t, :md5|:sha, String.t) :: Credential.t
   def credential(version, sec_level, sec_name, auth_proto, auth_pass)
@@ -448,53 +448,53 @@ defmodule SNMP do
 
   ## Examples
 
-    iex> SNMP.credential(:v3, :auth_priv, "user", :md5, "authpass", :des, "privpass")
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authPriv,
-      sec_name:  'user',
-      auth:      :usmHMACMD5AuthProtocol,
-      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
-      priv:      :usmDESPrivProtocol,
-      priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
-    }
+      iex> SNMP.credential(:v3, :auth_priv, "user", :md5, "authpass", :des, "privpass")
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authPriv,
+        sec_name:  'user',
+        auth:      :usmHMACMD5AuthProtocol,
+        auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+        priv:      :usmDESPrivProtocol,
+        priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
+      }
 
-    iex> SNMP.credential(:v3, :auth_priv, "user", :sha, "authpass", :des, "privpass")
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authPriv,
-      sec_name:  'user',
-      auth:      :usmHMACSHAAuthProtocol,
-      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
-      priv:      :usmDESPrivProtocol,
-      priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
-    }
+      iex> SNMP.credential(:v3, :auth_priv, "user", :sha, "authpass", :des, "privpass")
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authPriv,
+        sec_name:  'user',
+        auth:      :usmHMACSHAAuthProtocol,
+        auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+        priv:      :usmDESPrivProtocol,
+        priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
+      }
 
-    iex> SNMP.credential(:v3, :auth_priv, "user", :md5, "authpass", :aes, "privpass")
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authPriv,
-      sec_name:  'user',
-      auth:      :usmHMACMD5AuthProtocol,
-      auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
-      priv:      :usmAesCfb128Protocol,
-      priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
-    }
+      iex> SNMP.credential(:v3, :auth_priv, "user", :md5, "authpass", :aes, "privpass")
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authPriv,
+        sec_name:  'user',
+        auth:      :usmHMACMD5AuthProtocol,
+        auth_key:  [167, 81, 201, 199, 42, 46, 137, 43, 22, 203, 114, 40, 128, 16, 162, 141],
+        priv:      :usmAesCfb128Protocol,
+        priv_key:  [168, 5, 187, 57, 237, 205, 61, 51, 50, 34, 208, 202, 37, 247, 158, 92],
+      }
 
-    iex> SNMP.credential(:v3, :auth_priv, "user", :sha, "authpass", :aes, "privpass")
-    %SNMP.Credential{
-      version:   :v3,
-      sec_model: :usm,
-      sec_level: :authPriv,
-      sec_name:  'user',
-      auth:      :usmHMACSHAAuthProtocol,
-      auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
-      priv:      :usmAesCfb128Protocol,
-      priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
-    }
+      iex> SNMP.credential(:v3, :auth_priv, "user", :sha, "authpass", :aes, "privpass")
+      %SNMP.Credential{
+        version:   :v3,
+        sec_model: :usm,
+        sec_level: :authPriv,
+        sec_name:  'user',
+        auth:      :usmHMACSHAAuthProtocol,
+        auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
+        priv:      :usmAesCfb128Protocol,
+        priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
+      }
   """
   @spec credential(:v3, :auth_priv, String.t, :md5|:sha, String.t, :des|:aes, String.t) :: Credential.t
   def credential(version, sec_level, sec_name, auth_proto, auth_pass, priv_proto, priv_pass)
@@ -526,8 +526,8 @@ defmodule SNMP do
 
   ## Example
 
-    iex> SNMP.list_oid_to_string([1,3,6,1,2,1,1,5,0])
-    "1.3.6.1.2.1.1.5.0"
+      iex> SNMP.list_oid_to_string([1,3,6,1,2,1,1,5,0])
+      "1.3.6.1.2.1.1.5.0"
   """
   @spec list_oid_to_string([non_neg_integer]) :: String.t
   def list_oid_to_string(oid) when is_list oid do
@@ -539,8 +539,8 @@ defmodule SNMP do
 
   ## Example
 
-    iex> SNMP.string_oid_to_list("1.3.6.1.2.1.1.5.0")
-    [1,3,6,1,2,1,1,5,0]
+      iex> SNMP.string_oid_to_list("1.3.6.1.2.1.1.5.0")
+      [1,3,6,1,2,1,1,5,0]
   """
   @spec string_oid_to_list(String.t) :: [non_neg_integer]
   def string_oid_to_list(oid) when is_binary oid do
