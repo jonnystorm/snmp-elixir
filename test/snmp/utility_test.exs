@@ -3,44 +3,34 @@ defmodule SNMP.Utility.Test do
 
   import SNMP.Utility
 
-  @doc """
-  Takes
-
-      :e
-
-      :d
-       \
-        )=>:b
-       /
-      :a
-       \
-        `-> :c
-
-  to
-
-      [[:b,:c,:e], [:a, :d]]
-  """
-  test "Converts directed acyclic graph (DAG) to a strict poset" do
+  # Takes a strict poset, here represented as a Hasse diagram,
+  #
+  #       a   d
+  #      / \ /
+  #     b   c    e
+  #
+  # to
+  #
+  #     [[b, c, e], [a, d]]
+  #
+  test "Partitions a strict poset as maximal antichains of minimal elements" do
     adjacencies =
       %{:e => [],
         :b => [:d, :a],
         :c => [:a],
       }
 
-    assert convert_dag_to_strict_poset(adjacencies) ==
+    assert partition_poset_as_antichains_of_minimal_elements(adjacencies) ==
       [[:b, :c, :e], [:a, :d]]
   end
 
-  @doc """
-  Raises on
-
-      :d
-
-      :a<----:c
-        \     ^
-         \    |
-          '->:b
-  """
+  # Raises on
+  #
+  #     :a<----:c
+  #       \     ^
+  #        \    |
+  #         '->:b
+  #
   test "Raises when a cycle is detected" do
     adjacencies =
       %{:a => [:c],
@@ -48,8 +38,8 @@ defmodule SNMP.Utility.Test do
         :c => [:b],
       }
 
-    assert_raise RuntimeError, "detected cycle in subgraph: [:a, :b, :c]", fn ->
-      convert_dag_to_strict_poset(adjacencies)
+    assert_raise RuntimeError, "detected cycle in subset: [:a, :b, :c]", fn ->
+      partition_poset_as_antichains_of_minimal_elements(adjacencies)
     end
   end
 end

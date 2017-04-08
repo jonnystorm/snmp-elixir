@@ -4,22 +4,36 @@ defmodule SNMP.Utility do
   @spec get_local_engine_id() :: <<_::40>>
   def get_local_engine_id, do: <<0x8000000006::8*5>>
 
-  defp _convert_dag_to_strict_poset(remaining, adj_map, acc) do
-    if MapSet.size(remaining) > 0 do
-      next_remaining =
-        remaining
-        |> Enum.flat_map(& Map.get(adj_map, &1, []))
-        |> MapSet.new
+  # Takes
+  #
+  #      a   d
+  #     / \ /
+  #    b   c    e
+  #
+  # and returns
+  #
+  #    {bce}
+  #
+  defp subtract_minimal_elements_from_poset(poset, adj_map) do
+    poset
+    |> Enum.flat_map(& Map.get(adj_map, &1, []))
+    |> MapSet.new
+  end
 
-      if MapSet.size(next_remaining) == MapSet.size(remaining) do
-        list = MapSet.to_list remaining
+  defp _partition_poset_as_antichains_of_minimal_elements(poset, adj_map, acc) do
+    if MapSet.size(poset) > 0 do
+      next_poset = subtract_minimal_elements_from_poset(poset, adj_map)
 
-        raise RuntimeError, "detected cycle in subgraph: #{inspect list}"
+      minimal_elements = MapSet.difference(poset, next_poset)
+
+      if MapSet.size(minimal_elements) == 0 do
+        raise RuntimeError, "detected cycle in subset: #{inspect MapSet.to_list(poset)}"
       end
 
-      next_acc = [MapSet.difference(remaining, next_remaining) | acc]
+      next_acc = [minimal_elements|acc]
 
-      _convert_dag_to_strict_poset(next_remaining, adj_map, next_acc)
+      next_poset
+      |> _partition_poset_as_antichains_of_minimal_elements(adj_map, next_acc)
     else
       acc
       |> Enum.map(&MapSet.to_list &1)
@@ -27,11 +41,27 @@ defmodule SNMP.Utility do
     end
   end
 
-  @spec convert_dag_to_strict_poset(%{term => [term]}) :: [[term], ...]
-  def convert_dag_to_strict_poset(adjacency_map) do
+  # Takes mappings of the form {a => [b, c, ...]} to mean a < b, a < c, ...
+  #
+  # For the Hasse diagram
+  #
+  #    a   d
+  #   / \ /
+  #  b   c    e
+  #
+  # it returns
+  #
+  #    [[b, c, e], [a, d]]
+  #
+  @spec partition_poset_as_antichains_of_minimal_elements(%{term => [term]}) :: [[term], ...]
+  def partition_poset_as_antichains_of_minimal_elements(adjacency_map) do
     adjacency_map
     |> Map.keys
     |> MapSet.new
-    |> _convert_dag_to_strict_poset(adjacency_map, [])
+    |> _partition_poset_as_antichains_of_minimal_elements(adjacency_map, [])
   end
+
+  @spec order_imports_by_dependency_chains(%{term => [term]}) :: [[term], ...]
+  def order_imports_by_dependency_chains(adjacency_map),
+    do: partition_poset_as_antichains_of_minimal_elements(adjacency_map)
 end

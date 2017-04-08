@@ -55,6 +55,9 @@ defmodule SNMP.MIB do
   @type mib_file :: String.t
   @type include_paths :: [String.t]
 
+  @doc """
+  Compiles the MIB in `mib_file` with includes from `include_paths`.
+  """
   @spec compile(mib_file, include_paths) :: {:ok, term} | {:error, term}
   def compile(mib_file, include_paths) do
     erl_mib_file = :binary.bin_to_list mib_file
@@ -98,7 +101,7 @@ defmodule SNMP.MIB do
   @type mib_dir :: String.t
 
   @doc """
-  Compile all .mib files in `mib_path`.
+  Compile all .mib files in `mib_dirs`.
   """
   @spec compile_all([mib_dir]) :: [{mib_file, {:ok, term} | {:error, term}}]
   def compile_all(mib_dirs) when is_list mib_dirs do
@@ -107,11 +110,14 @@ defmodule SNMP.MIB do
     |> list_files_with_mib_extension
     |> get_imports_recursive
     |> convert_imports_to_adjacencies
-    |> Utility.convert_dag_to_strict_poset
+    |> Utility.order_imports_by_dependency_chains
     |> List.flatten
     |> Enum.map(&{&1, compile(&1, mib_dirs)})
   end
 
+  @doc """
+  Compile all .mib files in `mib_dir`.
+  """
   @spec compile_all(mib_dir) :: [{mib_file, {:ok, term} | {:error, term}}]
   def compile_all(mib_dir),
     do: compile_all([mib_dir])

@@ -324,6 +324,7 @@ defmodule SNMP do
         priv:      :usmAesCfb128Protocol,
         priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
       }
+
   """
   @spec credential([atom | String.t]) :: Credential.t
   def credential(args) when is_list args do
@@ -355,6 +356,7 @@ defmodule SNMP do
 
       iex> SNMP.credential(:v2c, "public")
       %SNMP.Credential{version: :v2, sec_model: :v2c, community: 'public'}
+
   """
   @spec credential(:v1 | :v2c, String.t) :: Credential.t
   def credential(version, community)
@@ -385,6 +387,7 @@ defmodule SNMP do
         sec_level: :noAuthNoPriv,
         sec_name:  'user',
       }
+
   """
   @spec credential(:v3, :no_auth_no_priv, String.t) :: Credential.t
   def credential(version, sec_level, sec_name)
@@ -421,6 +424,7 @@ defmodule SNMP do
         auth:      :usmHMACSHAAuthProtocol,
         auth_key:  [39, 237, 111, 41, 161, 2, 149, 234, 127, 88, 178, 4, 216, 251, 186, 158, 31, 164, 184, 199],
       }
+
   """
   @spec credential(:v3, :auth_no_priv, String.t, :md5|:sha, String.t) :: Credential.t
   def credential(version, sec_level, sec_name, auth_proto, auth_pass)
@@ -495,6 +499,7 @@ defmodule SNMP do
         priv:      :usmAesCfb128Protocol,
         priv_key:  [118, 114, 155, 192, 136, 56, 159, 175, 97, 219, 216, 18, 76, 140, 159, 2],
       }
+
   """
   @spec credential(:v3, :auth_priv, String.t, :md5|:sha, String.t, :des|:aes, String.t) :: Credential.t
   def credential(version, sec_level, sec_name, auth_proto, auth_pass, priv_proto, priv_pass)
@@ -528,6 +533,7 @@ defmodule SNMP do
 
       iex> SNMP.list_oid_to_string([1,3,6,1,2,1,1,5,0])
       "1.3.6.1.2.1.1.5.0"
+
   """
   @spec list_oid_to_string([non_neg_integer]) :: String.t
   def list_oid_to_string(oid) when is_list oid do
@@ -541,6 +547,7 @@ defmodule SNMP do
 
       iex> SNMP.string_oid_to_list("1.3.6.1.2.1.1.5.0")
       [1,3,6,1,2,1,1,5,0]
+
   """
   @spec string_oid_to_list(String.t) :: [non_neg_integer]
   def string_oid_to_list(oid) when is_binary oid do
