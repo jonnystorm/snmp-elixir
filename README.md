@@ -1,6 +1,7 @@
 # snmp-elixir
 
 [![Build Status](https://travis-ci.org/jonnystorm/snmp-elixir.svg?branch=master)](https://travis-ci.org/jonnystorm/snmp-elixir)
+([graphs](http://scribu.github.io/travis-stats/#jonnystorm/snmp-elixir/master))
 
 An SNMP client library for Elixir.
 
