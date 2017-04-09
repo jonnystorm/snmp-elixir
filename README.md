@@ -20,6 +20,13 @@ I didn't expect it to become one of the top Google results for "elixir snmp"
 but it is, which scares me. Elixir may be the best language for network
 interaction in existence, but we still need worthy SNMP support.
 
+## Contributing
+
+This project will accept (merge/rebase/squash) *all* contributions.
+Contributions that break the build will be reverted.
+
+For details, please see [Why Optimistic Merging Works Better](http://hintjens.com/blog:106).
+
 ## What I'm currently stuck on
 
 * Getting SNMPv3 USM to work (shit is hard)
