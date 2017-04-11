@@ -6,6 +6,9 @@ config :snmp_ex,
   timeout: 5000,
   max_repetitions: 10
 
+config :snmp, :manager,
+  config: [dir: './config/snmp', db_dir: './config/snmp_db']
+
 # This configuration is loaded before any dependency and is restricted
 # to this project. If another project depends on this project, this
 # file won't be loaded nor affect the parent project. For this reason,
