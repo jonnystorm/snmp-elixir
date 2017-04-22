@@ -1,8 +1,8 @@
 defmodule SNMP.Utility do
   @moduledoc false
 
-  @spec get_local_engine_id() :: <<_::40>>
-  def get_local_engine_id, do: <<0x8000000006::8*5>>
+  @spec local_engine_id() :: <<_::40>>
+  def local_engine_id, do: <<0x8000000006::8*5>>
 
   # Takes
   #
@@ -60,8 +60,4 @@ defmodule SNMP.Utility do
     |> MapSet.new
     |> _partition_poset_as_antichains_of_minimal_elements(adjacency_map, [])
   end
-
-  @spec order_imports_by_dependency_chains(%{term => [term]}) :: [[term], ...]
-  def order_imports_by_dependency_chains(adjacency_map),
-    do: partition_poset_as_antichains_of_minimal_elements(adjacency_map)
 end
