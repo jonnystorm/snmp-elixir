@@ -31,7 +31,7 @@ defmodule SNMP.Crypto do
       when algorithm in [:md5, :sha]
   do
     # Per RFC 3414, except use of localEngineID
-    eid = engine_id || Utility.get_local_engine_id()
+    eid = engine_id || Utility.local_engine_id
 
     password
     |> convert_password_to_intermediate_key(algorithm)

@@ -28,8 +28,8 @@ defmodule SNMP.MIB do
     |> Enum.to_list
   end
 
-  defp _get_imports_recursive([], acc), do: acc
-  defp _get_imports_recursive([mib_file|rest], acc) do
+  defp _get_imports([], acc), do: acc
+  defp _get_imports([mib_file|rest], acc) do
     imports =
       try do
         mib_file
@@ -46,11 +46,11 @@ defmodule SNMP.MIB do
           [{mib_file, []}]
       end
 
-    _get_imports_recursive(rest, Enum.concat(imports, acc))
+    _get_imports(rest, Enum.concat(imports, acc))
   end
 
-  defp get_imports_recursive(mib_files) when is_list(mib_files),
-    do: _get_imports_recursive(mib_files, [])
+  defp get_imports(mib_files) when is_list(mib_files),
+    do: _get_imports(mib_files, [])
 
   @type mib_file :: String.t
   @type include_paths :: [String.t]
@@ -98,6 +98,9 @@ defmodule SNMP.MIB do
   defp convert_imports_to_adjacencies(imports),
     do: Enum.group_by(imports, &elem(&1, 1), &elem(&1, 0))
 
+  defp order_imports_by_dependency_chains(adjacency_map),
+    do: Utility.partition_poset_as_antichains_of_minimal_elements(adjacency_map)
+
   @type mib_dir :: String.t
 
   @doc """
@@ -108,9 +111,9 @@ defmodule SNMP.MIB do
     # This doesn't handle subdirectories; may need to write find/2 later.
     mib_dirs
     |> list_files_with_mib_extension
-    |> get_imports_recursive
+    |> get_imports
     |> convert_imports_to_adjacencies
-    |> Utility.order_imports_by_dependency_chains
+    |> order_imports_by_dependency_chains
     |> List.flatten
     |> Enum.map(&{&1, compile(&1, mib_dirs)})
   end
