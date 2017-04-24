@@ -519,8 +519,6 @@ mteTriggerEntryStatus OBJECT-TYPE
 -- Trigger Delta Table
 --
 
-sysUpTimeInstance OBJECT IDENTIFIER ::= { sysUpTime 0 }
-
 mteTriggerDeltaTable OBJECT-TYPE
     SYNTAX      SEQUENCE OF MteTriggerDeltaEntry
     MAX-ACCESS  not-accessible
@@ -546,6 +544,8 @@ MteTriggerDeltaEntry ::= SEQUENCE {
     mteTriggerDeltaDiscontinuityIDWildcard        TruthValue,
     mteTriggerDeltaDiscontinuityIDType            INTEGER
 }
+
+sysUpTimeInstance OBJECT IDENTIFIER ::= { sysUpTime 0 }
 
 mteTriggerDeltaDiscontinuityID OBJECT-TYPE
     SYNTAX      OBJECT IDENTIFIER

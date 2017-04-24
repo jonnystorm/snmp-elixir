@@ -15,6 +15,18 @@ defmodule SNMP.MIB do
   defp builtin_mibs,
     do: ~w(SNMPv2-SMI RFC-1215 RFC-1212 SNMPv2-TC SNMPv2-CONF RFC1155-SMI)
 
+  defp get_obsolete_mib_rfc_tuple(mib_name) do
+    %{"IPV6-MIB"      => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-TC"       => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-ICMP-MIB" => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-TCP-MIB"  => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-UDP-MIB"  => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+    }[String.upcase(mib_name)]
+  end
+
+  defp is_obsolete_mib(mib_name),
+    do: get_obsolete_mib_rfc_tuple(mib_name) != nil
+
   defp exclude_builtin_mibs(mibs) do
     Enum.filter(mibs, & not &1 in builtin_mibs())
   end
@@ -60,24 +72,40 @@ defmodule SNMP.MIB do
   """
   @spec compile(mib_file, include_paths) :: {:ok, term} | {:error, term}
   def compile(mib_file, include_paths) do
+    outdir = Path.dirname(mib_file)
+    erl_outdir   = :binary.bin_to_list outdir
     erl_mib_file = :binary.bin_to_list mib_file
     erl_include_paths = Enum.map(include_paths, &:binary.bin_to_list("#{&1}/"))
-    outdir = :binary.bin_to_list Path.dirname(mib_file)
     options = [
-      warnings: false,
       #:warnings_as_errors,
+      :relaxed_row_name_assign_check,
+      warnings: false,
+      group_check: false,
       i: erl_include_paths,
-      outdir: outdir,
+      outdir: erl_outdir,
     ]
+
+    mib_name = Path.basename(mib_file, ".mib")
+
+    if is_obsolete_mib(mib_name) do
+      {rfc, link} = get_obsolete_mib_rfc_tuple(mib_name)
+
+      :ok = Logger.warn("Compiling obsolete MIB #{inspect mib_name}... This may not work. Please see #{rfc} at #{link} for details")
+    end
 
     case :snmpc.compile(erl_mib_file, options) do
       {:error, {:invalid_file, _}} = error ->
-        :ok = Logger.error("Unable to compile invalid MIB file: #{inspect mib_file}")
+        :ok = Logger.error("Unable to compile MIB #{inspect mib_file}: not a valid file")
 
         error
 
       {:error, {:invalid_option, option}} = error ->
-        :ok = Logger.error("Unable to compile MIB with invalid option: #{inspect option}")
+        :ok = Logger.error("Unable to compile MIB #{inspect mib_file} with invalid option #{inspect option}")
+
+        error
+
+      {:error, :compilation_failed} = error ->
+        :ok = Logger.error("Unable to compile MIB file #{inspect mib_file}")
 
         error
 
