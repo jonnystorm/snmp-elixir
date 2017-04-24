@@ -682,14 +682,14 @@ DskEntry ::= SEQUENCE {
     dskUsed		Integer32,
     dskPercent		Integer32,
     dskPercentNode	Integer32,
+    dskErrorFlag	UCDErrorFlag,
+    dskErrorMsg		DisplayString,
     dskTotalLow		Unsigned32,
     dskTotalHigh	Unsigned32,
     dskAvailLow		Unsigned32,
     dskAvailHigh	Unsigned32,
     dskUsedLow		Unsigned32,
-    dskUsedHigh		Unsigned32,
-    dskErrorFlag	UCDErrorFlag,
-    dskErrorMsg		DisplayString
+    dskUsedHigh		Unsigned32
 }
 
 dskIndex OBJECT-TYPE
