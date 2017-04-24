@@ -344,6 +344,12 @@ defmodule SNMP do
   def get(object, agent, credential, options),
     do: get([object], agent, credential, options)
 
+  def load_mib!(mib_name) when is_binary(mib_name),
+    do: :snmpm.load_mib :binary.bin_to_list(mib_name)
+
+  def resolve_object_name_to_oid(name) when is_atom(name),
+    do: :snmpm.name_to_oid(name)
+
   @doc """
   Returns a keyword list containing the given SNMPv1/2c/3 credentials.
 
