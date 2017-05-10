@@ -8,6 +8,7 @@ defmodule SNMP do
   """
 
   alias SNMP.{
+    MIB,
     Utility,
     CommunityCredential,
     USMNoAuthNoPrivCredential,
@@ -101,9 +102,58 @@ defmodule SNMP do
     }
   end
 
+  defp find_mibs_recursive(dir),
+    do: Utility.find_files_recursive(dir, ~r/\.(txt|mib)$/)
+
+  defp change_dirname(path, new_dirname) do
+    path
+    |> Path.basename
+    |> Path.absname(new_dirname)
+  end
+
+  defp change_extension(path, new_extension),
+    do: Path.rootname(path) <> new_extension
+
+  defp mib_cache,
+    do: Path.expand Application.get_env(:snmp_ex, :mib_cache)
+
+  defp mib_sources,
+    do: Application.get_env(:snmp_ex, :mib_sources)
+
+  defp update_mib_cache do
+    cache_dir = mib_cache()
+    source_dirs = mib_sources()
+
+    _ = File.mkdir_p cache_dir
+
+    _ =
+      source_dirs
+      |> Stream.map(&Path.expand/1)
+      |> Stream.flat_map(&find_mibs_recursive/1)
+      |> Enum.uniq
+      |> Enum.map(fn source ->
+        destination =
+          source
+          |> change_dirname(cache_dir)
+          |> change_extension(".mib")
+
+        :ok = File.cp!(source, destination)
+      end)
+
+    _ = MIB.compile_all cache_dir
+  end
+
+  defp load_cached_mibs do
+    mib_cache()
+    |> Utility.find_files_recursive(~r/\.bin$/)
+    |> Enum.map(&load_mib/1)
+  end
+
   def start do
-    :ok = :snmpm.start()
+    :ok = :snmpm.start
     :ok = :snmpm.register_user(__MODULE__, :snmpm_user_default, self())
+    _ = update_mib_cache()
+    _ = load_cached_mibs()
 
     :ok
   end
@@ -233,6 +283,18 @@ defmodule SNMP do
           {oid, type, value}
         end)
 
+      {:error, {:invalid_oid, {:error, :not_found}}} ->
+        :ok = Logger.error("Unknown OID")
+
+        {:error, :unknown_oid}
+
+      {:error, {:invalid_oid, {:ok, oid}}} ->
+        oid_string = Enum.join(oid, ".")
+
+        :ok = Logger.error("Invalid OID #{inspect oid_string}")
+
+        {:error, {:invalid_oid, oid}}
+
       {:error, {:send_failed, _, reason}} ->
         :ok = Logger.error("Send failed: #{inspect reason}")
 
@@ -267,11 +329,6 @@ defmodule SNMP do
   defp sha_sum(string) when is_binary(string),
     do: :crypto.hash(:sha, string)
 
-  def resolve_mib_name(name) do
-    # TODO: Implement this
-    name
-  end
-
   defp is_dotted_decimal(string),
     do: string =~ ~r/^\.?\d(\.\d)+$/
 
@@ -286,9 +343,9 @@ defmodule SNMP do
           [string_oid_to_list(object)|acc]
 
         true ->
-          dot_dec = resolve_mib_name(object)
+          atom = String.to_atom object
 
-          [string_oid_to_list(dot_dec)|acc]
+          [resolve_object_name_to_oid(atom)|acc]
       end
     end)
     |> Enum.reverse
@@ -344,11 +401,44 @@ defmodule SNMP do
   def get(object, agent, credential, options),
     do: get([object], agent, credential, options)
 
-  def load_mib!(mib_name) when is_binary(mib_name),
-    do: :snmpm.load_mib :binary.bin_to_list(mib_name)
+  @type mib_name :: String.t
 
-  def resolve_object_name_to_oid(name) when is_atom(name),
-    do: :snmpm.name_to_oid(name)
+  @spec load_mib(mib_name) :: :ok | {:error, term}
+  def load_mib(mib_name) do
+    erl_mib_name = :binary.bin_to_list mib_name
+
+    case :snmpm.load_mib(erl_mib_name) do
+      :ok ->
+        :ok
+
+      {:error, reason} = error ->
+        :ok = Logger.error("Unable to load MIB #{inspect mib_name}: #{reason}")
+
+        error
+    end
+  end
+
+  @spec load_mib!(mib_name) :: :ok | no_return
+  def load_mib!(mib_name) when is_binary(mib_name) do
+    if load_mib(mib_name) == :ok do
+      :ok
+    else
+      raise "Unable to load mib #{inspect mib_name}"
+    end
+  end
+
+  def resolve_object_name_to_oid(name) when is_atom(name) do
+    try do
+      with {:ok, [oid]} <- :snmpm.name_to_oid(name),
+        do: {:ok, oid}
+
+    rescue
+      e in ArgumentError ->
+        :ok = Logger.warn("Unhandled exception: did you forget to `SNMP.start`?")
+
+        reraise e, System.stacktrace
+    end
+  end
 
   @doc """
   Returns a keyword list containing the given SNMPv1/2c/3 credentials.
