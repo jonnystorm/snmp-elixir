@@ -77,10 +77,9 @@ defmodule SNMP.MIB do
     erl_mib_file = :binary.bin_to_list mib_file
     erl_include_paths = Enum.map(include_paths, &:binary.bin_to_list("#{&1}/"))
     options = [
-      #:warnings_as_errors,
-      :relaxed_row_name_assign_check,
+      :relaxed_row_name_assign_check,  # added this on a lark; mistake?
       warnings: false,
-      group_check: false,
+      group_check: false,              # patched UCD-SNMP-MIB fails without this
       i: erl_include_paths,
       outdir: erl_outdir,
     ]
@@ -136,7 +135,6 @@ defmodule SNMP.MIB do
   """
   @spec compile_all([mib_dir]) :: [{mib_file, {:ok, term} | {:error, term}}]
   def compile_all(mib_dirs) when is_list mib_dirs do
-    # This doesn't handle subdirectories; may need to write find/2 later.
     mib_dirs
     |> list_files_with_mib_extension
     |> get_imports
