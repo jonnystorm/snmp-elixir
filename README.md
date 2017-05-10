@@ -36,7 +36,7 @@ For details, please see [Why Optimistic Merging Works Better](http://hintjens.co
 
 * SNMPv3 USM
 * SNMP tables
-* MIB name resolution
+* ~~MIB name resolution~~
 * Basic SNMP operations
 * Process management
 * Make it decent
