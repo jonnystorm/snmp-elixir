@@ -34,7 +34,7 @@ defmodule SNMP.Mixfile do
     # Specify extra applications you'll use from Erlang/Elixir
     [ extra_applications: [
         :logger,
-        :netaddr_ex
+        :netaddr_ex,
       ],
       env: [
         mib_cache: "/tmp/snmp_ex/mibs",
