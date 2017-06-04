@@ -27,17 +27,17 @@ Contributions that break the build will be reverted.
 
 For details, please see [Why Optimistic Merging Works Better](http://hintjens.com/blog:106).
 
-## What I'm currently stuck on
+## What we're currently stuck on
 
-* Getting SNMPv3 USM to work (shit is hard)
 * USM engineID discovery (a la [RFC 3414](https://tools.ietf.org/html/rfc3414#section-4))
 
 ## TODO
 
-* SNMPv3 USM
+* SNMPv3 USM (~~noAuthNoPriv~~, ~~authNoPriv~~, ~~authPriv-DES~~, authPriv-AES128)
+* USM engine discovery
 * SNMP tables
 * ~~MIB name resolution~~
-* Basic SNMP operations
+* Basic SNMP operations (~~GET~~, SET)
 * Process management
 * Make it decent
 
@@ -51,4 +51,3 @@ def deps do
   ]
 end
 ```
-
