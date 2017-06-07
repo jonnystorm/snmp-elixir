@@ -29,4 +29,3 @@ erl_crash.dump
 
 /snmp/agent/*.conf
 /snmp_db/
-snmp/
