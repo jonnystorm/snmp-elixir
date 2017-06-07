@@ -26,3 +26,7 @@ erl_crash.dump
 # Ignore OTP SNMP files
 /manager.conf
 /snmpm_config_db
+
+/snmp/agent/*.conf
+/snmp_db/
+snmp/
