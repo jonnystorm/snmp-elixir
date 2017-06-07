@@ -103,7 +103,7 @@ defmodule SNMP.Test do
     test "get engine discovery" do
       for auth <- [:md5, :sha], priv <- [:des] do
         credential = get_credential(auth, priv)
-        assert get_sysname_with_engine_id(credential) == [@sysname_value]
+        assert get_sysname(credential) == [@sysname_value]
       end
     end
   end
