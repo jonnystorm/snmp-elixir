@@ -12,6 +12,7 @@ defmodule SNMP do
     Utility,
     CommunityCredential,
     USMCredential,
+    DiscoverAgent
   }
 
   require Logger

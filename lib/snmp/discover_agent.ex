@@ -1,4 +1,4 @@
-defmodule DiscoverAgent do
+defmodule SNMP.DiscoverAgent do
 
   @moduledoc """
   Provides abstractions to SNMP engine discovery through snmp agent
