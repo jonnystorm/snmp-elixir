@@ -24,11 +24,12 @@ defmodule SNMP.DiscoverAgent do
     :snmpa_conf.write_community_config('snmp/agent', [])
     :snmpa_conf.write_usm_config('snmp/agent', [])
     :snmpa_conf.write_context_config('snmp/agent', [])
+    :snmpa_conf.write_notify_config('snmp/agent', [])
   end
 
   def seed_agent_config(opts) do
     opts = Keyword.merge([intAgentTransports: [transportDomainUdpIpv4: {127,0,0,1}, transportDomainUdpIpv6: {0,0,0,0,0,0,0,1}],
-                                snmpEngineID: 'snmp_agent_engine',
+                                snmpEngineID: 'snmp_discovery_agent_engine',
                              intAgentUDPPort: 6000,
                     snmpEngineMaxMessageSize: 484], opts[:agent_config] || [])
     conf_items = Enum.map(opts, fn({key, value}) -> :snmpa_conf.agent_entry(key, value) end)
