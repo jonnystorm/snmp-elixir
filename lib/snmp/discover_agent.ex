@@ -7,15 +7,21 @@ defmodule SNMP.DiscoverAgent do
   use GenServer
   require Logger
 
-  @name DiscoverAgent
-
   def start_link(state \\ [], opts \\ []) do
-    GenServer.start_link(__MODULE__, state, [name: @name] ++ opts)
+    GenServer.start_link(__MODULE__, state, [name: __MODULE__] ++ opts)
   end
 
   def init(opts) do
     GenServer.cast(self(), {:seed_and_start_agent, opts})
     {:ok, []}
+  end
+
+  def handle_cast({:seed_and_start_agent, opts}, state) do
+    mandatory_config_files = ["snmp/agent/agent.conf", "snmp/agent/standard.conf", "snmp/agent/usm.conf", "snmp/agent/community.conf"]
+    is_seeded = Enum.all?(mandatory_config_files, &(File.exists?(&1)))
+    unless is_seeded, do: seed_config(opts)
+    start_agent()
+    {:noreply, state}
   end
 
   def seed_config(opts) do
@@ -55,7 +61,7 @@ defmodule SNMP.DiscoverAgent do
     Logger.info("Starting snmp agent...")
     args = [  agent_type: :master,
               discovery: [originating: [enable: true], terminating: [enable: true]],
-              db_dir: 'snmp_db/agent',
+              db_dir: 'snmp/agent/db',
               db_init_error: :create_db_and_dir,
               config: [ dir: 'snmp/agent' ],
            ]
@@ -71,7 +77,7 @@ defmodule SNMP.DiscoverAgent do
   end
 
   def find_engine_id(ip_address, opts \\ []) do
-    GenServer.call(@name, {:discover_engine_id, ip_address, opts})
+    GenServer.call(__MODULE__, {:discover_engine_id, ip_address, opts})
   end
 
   def handle_call({:discover_engine_id, ip_address, opts_input}, _from, state) when is_binary(ip_address) do
@@ -89,13 +95,6 @@ defmodule SNMP.DiscoverAgent do
 
     {:ok, engine_id} = :snmpa.discovery(agent_name, opts[:notification])
     {:reply, engine_id, state}
-  end
-
-  def handle_cast({:seed_and_start_agent, opts}, state) do
-    is_seeded = Enum.all?(["snmp/agent/agent.conf", "snmp/agent/standard.conf"], &(File.exists?(&1)))
-    unless is_seeded, do: seed_config(opts)
-    start_agent()
-    {:noreply, state}
   end
 
 end
