@@ -20,17 +20,17 @@ defmodule SNMP.DiscoverAgent do
     mandatory_config_files = ["snmp/agent/agent.conf", "snmp/agent/standard.conf", "snmp/agent/usm.conf", "snmp/agent/community.conf"]
     is_seeded = Enum.all?(mandatory_config_files, &(File.exists?(&1)))
     unless is_seeded, do: seed_config(opts)
-    start_agent()
+    {:ok, _} = start_agent()
     {:noreply, state}
   end
 
   def seed_config(opts) do
     seed_agent_config(opts)
     seed_standard_config(opts)
-    :snmpa_conf.write_community_config('snmp/agent', [])
-    :snmpa_conf.write_usm_config('snmp/agent', [])
-    :snmpa_conf.write_context_config('snmp/agent', [])
-    :snmpa_conf.write_notify_config('snmp/agent', [])
+    :ok = :snmpa_conf.write_community_config('snmp/agent', [])
+    :ok = :snmpa_conf.write_usm_config('snmp/agent', [])
+    :ok = :snmpa_conf.write_context_config('snmp/agent', [])
+    :ok = :snmpa_conf.write_notify_config('snmp/agent', [])
   end
 
   def seed_agent_config(opts) do
@@ -40,8 +40,8 @@ defmodule SNMP.DiscoverAgent do
                     snmpEngineMaxMessageSize: 484], opts[:agent_config] || [])
     conf_items = Enum.map(opts, fn({key, value}) -> :snmpa_conf.agent_entry(key, value) end)
 
-    :snmpa_conf.write_agent_config('snmp/agent', conf_items)
-    Logger.info("SNMP agent.conf created - #{inspect :snmpa_conf.read_agent_config('snmp/agent')}")
+    :ok = :snmpa_conf.write_agent_config('snmp/agent', conf_items)
+    :ok = Logger.info("SNMP agent.conf created - #{inspect :snmpa_conf.read_agent_config('snmp/agent')}")
   end
 
   def seed_standard_config(opts) do
@@ -53,19 +53,19 @@ defmodule SNMP.DiscoverAgent do
                           sysServices: 72,
                           snmpEnableAuthenTraps: :disabled], opts[:standard_config] || [])
     conf_items = Enum.map(opts, fn({key, value}) -> :snmpa_conf.standard_entry(key, value) end)
-    :snmpa_conf.write_standard_config('snmp/agent', conf_items)
-    Logger.info("SNMP standard.conf created - #{inspect :snmpa_conf.read_standard_config('snmp/agent')}")
+    :ok = :snmpa_conf.write_standard_config('snmp/agent', conf_items)
+    :ok = Logger.info("SNMP standard.conf created - #{inspect :snmpa_conf.read_standard_config('snmp/agent')}")
   end
 
   def start_agent() do
-    Logger.info("Starting snmp agent...")
+    :ok = Logger.info("Starting snmp agent...")
     args = [  agent_type: :master,
               discovery: [originating: [enable: true], terminating: [enable: true]],
               db_dir: 'snmp/agent/db',
               db_init_error: :create_db_and_dir,
               config: [ dir: 'snmp/agent' ],
            ]
-    :snmpa_supervisor.start_master_sup(args)
+    {:ok, _} = :snmpa_supervisor.start_master_sup(args)
     configure_discovery_config()
   end
 
