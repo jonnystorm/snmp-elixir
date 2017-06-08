@@ -12,7 +12,7 @@ defmodule SNMP do
     Utility,
     CommunityCredential,
     USMCredential,
-    DiscoverAgent
+    DiscoveryAgent
   }
 
   require Logger
@@ -109,7 +109,7 @@ defmodule SNMP do
 
   def start do
     :ok = :snmpm.start
-    {:ok, _pid} = DiscoverAgent.start_link
+    {:ok, _pid} = DiscoveryAgent.start_link
     :ok = :snmpm.register_user(__MODULE__, :snmpm_user_default, self())
     _ = update_mib_cache()
     _ = load_cached_mibs()
@@ -308,7 +308,7 @@ defmodule SNMP do
       case :snmpm_config.get_agent_engine_id(target_name) do
           {:ok, engine_id} -> engine_id
           _ ->
-            DiscoverAgent.find_engine_id(netaddr.address, port: uri.port)
+            DiscoveryAgent.find_engine_id(netaddr.address, port: uri.port)
       end
     :binary.list_to_bin(engine_id)
   end
