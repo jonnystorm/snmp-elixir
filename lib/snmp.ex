@@ -12,6 +12,7 @@ defmodule SNMP do
     Utility,
     CommunityCredential,
     USMCredential,
+    DiscoveryAgent
   }
 
   require Logger
@@ -108,10 +109,10 @@ defmodule SNMP do
 
   def start do
     :ok = :snmpm.start
+    {:ok, _pid} = DiscoveryAgent.start_link
     :ok = :snmpm.register_user(__MODULE__, :snmpm_user_default, self())
     _ = update_mib_cache()
     _ = load_cached_mibs()
-
     :ok
   end
 
@@ -216,34 +217,31 @@ defmodule SNMP do
 
   defp register_usm_user(_credential, _engine_id), do: :ok
 
-  defp register_agent(target, uri, credential, engine_id) do
-    with {:ok, netaddr} <- resolve_host_to_netaddr(uri.host)
-    do
-      cred_list = Map.to_list credential
-      cred_keys = [:version, :sec_model, :community, :sec_level, :sec_name]
-      config =
-        [ engine_id: engine_id,
-            address: NetAddr.netaddr_to_list(netaddr),
-               port: uri.port || 161,
-            tdomain: get_transport_from_netaddr(netaddr),
-        ] ++ Keyword.take(cred_list, cred_keys)
+  defp register_agent(target, uri, netaddr, credential, engine_id) do
+    cred_list = Map.to_list credential
+    cred_keys = [:version, :sec_model, :community, :sec_level, :sec_name]
+    config =
+      [ engine_id: engine_id,
+          address: NetAddr.netaddr_to_list(netaddr),
+             port: uri.port || 161,
+          tdomain: get_transport_from_netaddr(netaddr),
+      ] ++ Keyword.take(cred_list, cred_keys)
 
-      :ok = Logger.debug("Will register agent #{uri} with target #{inspect target} and config #{inspect config}.")
+    :ok = Logger.debug("Will register agent #{uri} with target #{inspect target} and config #{inspect config}.")
 
-      case :snmpm.register_agent(__MODULE__, target, config) do
-        :ok ->
-          :ok
-        {:error, {:already_registered, _}} ->
-          :ok
+    case :snmpm.register_agent(__MODULE__, target, config) do
+      :ok ->
+        :ok
+      {:error, {:already_registered, _}} ->
+        :ok
 
-        {:error, {:already_registered, _, _}} ->
-          :ok
+      {:error, {:already_registered, _, _}} ->
+        :ok
 
-        {:error, reason} = error ->
-          :ok = Logger.error("Unable to register agent for #{uri}: #{inspect reason}")
+      {:error, reason} = error ->
+        :ok = Logger.error("Unable to register agent for #{uri}: #{inspect reason}")
 
-          error
-      end
+        error
     end
   end
 
@@ -305,9 +303,22 @@ defmodule SNMP do
     end
   end
 
-  defp discover_engine_id(_uri) do
-    # TODO: Figure out how to not fake this.
-    Utility.local_engine_id
+  defp discover_engine_id(uri, netaddr, target_name) do
+    engine_id =
+      case :snmpm_config.get_agent_engine_id(target_name) do
+          {:ok, engine_id} -> engine_id
+          _ ->
+            DiscoveryAgent.find_engine_id(netaddr.address, port: uri.port)
+      end
+    :binary.list_to_bin(engine_id)
+  end
+
+  defp warmup_engine_boots_and_engine_time(engine_id, target_name) do
+    {:ok, engine_boots} = :snmpm_config.get_usm_eboots(engine_id)
+    if engine_boots == 0 do
+      :snmpm.sync_get(__MODULE__, target_name, [], 2000) #warm-up to update the engineBoots and engineTime in SNMPM.
+    end
+    :ok
   end
 
   defp sha_sum(string) when is_binary(string),
@@ -359,17 +370,19 @@ defmodule SNMP do
 
   defp perform_snmp_op(op, objects, agent, credential, options) do
     uri  = normalize_to_uri(agent)
+    {:ok, netaddr} = resolve_host_to_netaddr(uri.host)
     oids = normalize_to_oids(objects)
 
     target      = generate_target_name(uri, credential)
     erl_context = :binary.bin_to_list Keyword.get(options, :context, "")
     engine_id   =
       options
-      |> Keyword.get(:engine_id, discover_engine_id(uri))
+      |> Keyword.get(:engine_id, discover_engine_id(uri, netaddr, target))
       |> :binary.bin_to_list
 
     with :ok <- register_usm_user(credential, engine_id),
-         :ok <- register_agent(target, uri, credential, engine_id)
+         :ok <- register_agent(target, uri, netaddr, credential, engine_id),
+         :ok <- warmup_engine_boots_and_engine_time(engine_id, target)
     do
       op
       |> _perform_snmp_op(oids, target, erl_context, get_timeout())

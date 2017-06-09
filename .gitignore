@@ -20,9 +20,12 @@ erl_crash.dump
 *.ez
 
 # Ignore hidden and swap files
-.*
+.*~.gitkeep
 *~
 
 # Ignore OTP SNMP files
 /manager.conf
 /snmpm_config_db
+
+snmp/agent/*.conf
+snmp/agent/db/*
