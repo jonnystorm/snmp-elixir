@@ -9,15 +9,18 @@ defmodule SNMP.DiscoveryAgent.Test do
 
   defp setup_start_agent(context) do
     start_agent()
+
     context
   end
 
-  describe "find engine id" do
+  describe "discover engine id" do
     setup [:setup_start_agent]
 
     test "agent engine id" do
-      assert DiscoveryAgent.find_engine_id({127, 0, 0, 1}, port: 6000) == 'snmp_discovery_agent_engine'
+      uri = URI.parse "snmp://127.0.0.1:6000"
+
+      assert DiscoveryAgent.discover_engine_id(uri)
+        == 'snmp_discovery_agent_engine'
     end
   end
-
 end

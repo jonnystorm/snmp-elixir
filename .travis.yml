@@ -4,6 +4,10 @@ elixir:
   - 1.4.2
 otp_release:
   - 19.2
+matrix:
+  include:
+    - otp_release: 20.0-rc1
+      elixir: 1.4.4
 sudo: false
 before_script:
   - export APP_NAME=snmp_ex
