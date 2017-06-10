@@ -6,6 +6,8 @@ otp_release:
   - 19.2
 matrix:
   include:
+    - otp_release: 19.3
+      elixir: 1.4.4
     - otp_release: 20.0-rc1
       elixir: 1.4.4
 sudo: false
@@ -20,7 +22,7 @@ before_script:
   - cd ..
   # Download and stage pre-built PLT
   - export PLT_FILENAME=elixir-${TRAVIS_ELIXIR_VERSION}_${TRAVIS_OTP_RELEASE}.plt
-  - export PLT_TESTNAME=dialyxir_erlang-${TRAVIS_OTP_RELEASE}_elixir-${TRAVIS_ELIXIR_VERSION}_deps-${MIX_ENV}.plt
+  - export PLT_TESTNAME=dialyxir_erlang-${TRAVIS_OTP_RELEASE/-rc*/}_elixir-${TRAVIS_ELIXIR_VERSION}_deps-${MIX_ENV}.plt
   - export PLT_LOCATION=_build/$MIX_ENV/$PLT_TESTNAME
   - mkdir -p _build/$MIX_ENV
   - wget -O $PLT_LOCATION https://raw.github.com/jonnystorm/travis_elixir_plts/master/$PLT_FILENAME

@@ -3,12 +3,8 @@ defmodule SNMP.DiscoveryAgent.Test do
 
   alias SNMP.DiscoveryAgent
 
-  defp start_agent(opts \\ []) do
-    {:ok, _pid} = DiscoveryAgent.start_link([], opts)
-  end
-
   defp setup_start_agent(context) do
-    start_agent()
+    _ = DiscoveryAgent.start_link
 
     context
   end
