@@ -72,8 +72,11 @@ defmodule SNMP do
   defp change_extension(path, new_extension),
     do: Path.rootname(path) <> new_extension
 
-  defp mib_cache,
-    do: Path.expand Application.get_env(:snmp_ex, :mib_cache)
+  defp mib_cache do
+    :snmp_ex
+    |> Application.get_env(:mib_cache)
+    |> Path.expand
+  end
 
   defp mib_sources,
     do: Application.get_env(:snmp_ex, :mib_sources)
@@ -110,7 +113,11 @@ defmodule SNMP do
   def start do
     :ok = :snmpm.start
     {:ok, _pid} = DiscoveryAgent.start_link
-    :ok = :snmpm.register_user(__MODULE__, :snmpm_user_default, self())
+
+    module = :snmpm_user_default
+
+    :ok = :snmpm.register_user(__MODULE__, module, self())
+
     _ = update_mib_cache()
     _ = load_cached_mibs()
     :ok
@@ -126,11 +133,16 @@ defmodule SNMP do
   defp get_delimiter_by_family(6), do: ":"
 
   defp get_host_by_name(hostname) do
-    result = :inet.gethostbyname :binary.bin_to_list(hostname)
+    result =
+      hostname
+      |> :binary.bin_to_list
+      |> :inet.gethostbyname
 
-    with {:ok, {_, _, _, _, family, [address|_]}} <- result
+    with {:ok, {_, _, _, _, family, [address|_]}}
+           <- result
     do
-      delimiter = get_delimiter_by_family(family)
+      delimiter = get_delimiter_by_family family
+
       address_string =
         address
         |> Tuple.to_list
@@ -203,11 +215,16 @@ defmodule SNMP do
     ]
   end
 
-  defp register_usm_user(%{sec_model: :usm} = credential, engine_id) do
+  defp register_usm_user(
+    %{sec_model: :usm} = credential,
+    engine_id
+  ) do
     username = credential.sec_name
     config = get_usm_user_config(credential, engine_id)
-
-    case :snmpm.register_usm_user(engine_id, username, config) do
+    result =
+      :snmpm.register_usm_user(engine_id, username, config)
+    
+    case result do
       :ok ->
         :ok
 
@@ -224,9 +241,16 @@ defmodule SNMP do
   defp register_usm_user(_credential, _engine_id), do: :ok
 
   defp register_agent(target, uri, credential, engine_id) do
-    netaddr = NetAddr.ip uri.host
+    netaddr   = NetAddr.ip uri.host
     cred_list = Map.to_list credential
-    cred_keys = [:version, :sec_model, :community, :sec_level, :sec_name]
+    cred_keys =
+      [ :version,
+        :sec_model,
+        :community,
+        :sec_level,
+        :sec_name,
+      ]
+
     config =
       [ engine_id: engine_id,
           address: NetAddr.netaddr_to_list(netaddr),
@@ -236,9 +260,13 @@ defmodule SNMP do
 
     :ok = Logger.debug("Will register agent #{uri} with target #{inspect target} and config #{inspect config}.")
 
-    case :snmpm.register_agent(__MODULE__, target, config) do
+    result =
+      :snmpm.register_agent(__MODULE__, target, config)
+    
+    case result do
       :ok ->
         :ok
+
       {:error, {:already_registered, _}} ->
         :ok
 
@@ -264,10 +292,15 @@ defmodule SNMP do
   end
 
   defp groom_snmp_result(result) do
+    sort_fun =
+      fn {_, _, _, _, original_index} ->
+        original_index
+      end
+
     case result do
       {:ok, {:noError, 0, varbinds}, _} ->
         varbinds
-        |> Enum.sort_by(fn {_, _, _, _, original_index} -> original_index end)
+        |> Enum.sort_by(sort_fun)
         |> Enum.map(fn {_, oid, type, value, _} ->
           {oid, type, value}
         end)
@@ -292,7 +325,7 @@ defmodule SNMP do
       {:error, {:invalid_sec_info, _, snmp_info}} ->
         {_, _, [{:varbind, oid, _, _, _}|_]} = snmp_info
 
-        name = usm_stat_oid_to_name(oid)
+        name = usm_stat_oid_to_name oid
 
         :ok = Logger.error("Received USM stats response: #{name}")
 
@@ -311,23 +344,31 @@ defmodule SNMP do
   end
 
   defp discover_engine_id(uri, target_name) do
+    result = :snmpm_config.get_agent_engine_id target_name
+
     engine_id =
-      case :snmpm_config.get_agent_engine_id(target_name) do
+      case result do
         {:ok, engine_id} ->
           engine_id
 
         _ ->
-          DiscoveryAgent.discover_engine_id(uri)
+          DiscoveryAgent.discover_engine_id uri
       end
 
     :binary.list_to_bin(engine_id)
   end
 
-  defp warmup_engine_boots_and_engine_time(engine_id, target_name) do
-    {:ok, engine_boots} = :snmpm_config.get_usm_eboots(engine_id)
+  defp warmup_engine_boots_and_engine_time(
+    engine_id,
+    target_name
+  ) do
+    {:ok, engine_boots} =
+      :snmpm_config.get_usm_eboots engine_id
 
     if engine_boots == 0 do
-      # warm-up to update the engineBoots and engineTime in SNMPM.
+      # warm-up to update the engineBoots and engineTime in
+      # SNMPM
+
       :snmpm.sync_get(__MODULE__, target_name, [], 2000)
     end
 
@@ -374,56 +415,162 @@ defmodule SNMP do
     end
   end
 
-  defp _perform_snmp_op(op, oids, target, context, timeout) do
+  defp _perform_snmp_op(
+    op,
+    oids,
+    target,
+    context,
+    timeout
+  ) do
     case op do
       :get ->
-        :snmpm.sync_get(__MODULE__, target, context, oids, timeout)
+        :snmpm.sync_get(
+          __MODULE__,
+          target,
+          context,
+          oids,
+          timeout
+        )
+
+      :get_next ->
+        :snmpm.sync_get_next(
+          __MODULE__,
+          target,
+          context,
+          oids,
+          timeout
+        )
     end
   end
 
-  defp perform_snmp_op(op, objects, agent, credential, options) do
+  defp perform_snmp_op(
+    op,
+    objects,
+    agent,
+    credential,
+    options
+  ) do
     uri =
       agent
       |> normalize_to_uri
       |> resolve_host_in_uri
 
-    oids = normalize_to_oids(objects)
-
+    oids        = normalize_to_oids(objects)
     target      = generate_target_name(uri, credential)
-    erl_context = :binary.bin_to_list Keyword.get(options, :context, "")
-    engine_id   =
+    erl_context =
       options
-      |> Keyword.get(:engine_id, discover_engine_id(uri, target))
+      |> Keyword.get(:context, "")
       |> :binary.bin_to_list
 
-    with :ok <- register_usm_user(credential, engine_id),
-         :ok <- register_agent(target, uri, credential, engine_id),
-         :ok <- warmup_engine_boots_and_engine_time(engine_id, target)
+    discover_fun =
+      fn ->
+        discover_engine_id(uri, target)
+      end
+
+    engine_id =
+      options
+      |> Keyword.get_lazy(:engine_id, discover_fun)
+      |> :binary.bin_to_list
+
+    with :ok <-
+           register_usm_user(credential, engine_id),
+
+         :ok <-
+           register_agent(
+             target,
+             uri,
+             credential,
+             engine_id
+           ),
+
+         :ok <-
+           warmup_engine_boots_and_engine_time(
+             engine_id,
+             target
+           )
     do
-      op
-      |> _perform_snmp_op(oids, target, erl_context, get_timeout())
-      |> groom_snmp_result
+      result =
+        _perform_snmp_op(
+          op,
+          oids,
+          target,
+          erl_context,
+          get_timeout()
+        )
+
+      groom_snmp_result result
     end
   end
 
   defp generate_target_name(uri, credential) do
-    # Make a concise target name that is unique per host, per credential
-    :binary.bin_to_list sha_sum("#{uri}#{inspect credential}")
+    # Make a concise target name that is unique per host,
+    # per credential
+
+    "#{uri}#{inspect credential}"
+    |> sha_sum
+    |> :binary.bin_to_list
   end
 
   def get(objects, agent, credential, options \\ [])
 
   def get([h|_] = objects, agent, credential, options)
       when is_list(h)
-        or is_binary(h),
-    do: perform_snmp_op(:get, objects, agent, credential, options)
+        or is_binary(h)
+  do
+    perform_snmp_op(
+      :get,
+      objects,
+      agent,
+      credential,
+      options
+    )
+  end
 
   def get(object, agent, credential, options),
     do: get([object], agent, credential, options)
 
+  def get_next(objects, agent, credential, options \\ [])
+
+  def get_next([h|_] = objects, agent, credential, options)
+      when is_list(h)
+        or is_binary(h)
+  do
+    perform_snmp_op(
+      :get_next,
+      objects,
+      agent,
+      credential,
+      options
+    )
+  end
+
+  def get_next(object, agent, credential, options),
+    do: get_next([object], agent, credential, options)
+
+  def walk(object, agent, credential, options \\ [])
+
+  def walk(object, agent, credential, options) do
+    base_oid = resolve_object_name_to_oid object
+
+    {base_oid ++ [0], nil, nil}
+    |> Stream.iterate(fn last_result ->
+      {last_oid, _, _} = last_result
+
+      last_oid
+      |> get_next(agent, credential, options)
+      |> List.first
+    end)
+    |> Stream.take_while(fn {oid, _, _} ->
+      List.starts_with?(oid, base_oid)
+    end)
+    |> Stream.drop(1)
+  end
+
   @type mib_name :: String.t
 
-  @spec load_mib(mib_name) :: :ok | {:error, term}
+  @spec load_mib(mib_name)
+    :: :ok
+     | {:error, term}
   def load_mib(mib_name) do
     erl_mib_name = :binary.bin_to_list mib_name
 
@@ -438,7 +585,9 @@ defmodule SNMP do
     end
   end
 
-  @spec load_mib!(mib_name) :: :ok | no_return
+  @spec load_mib!(mib_name)
+    :: :ok
+     | no_return
   def load_mib!(mib_name) when is_binary(mib_name) do
     if load_mib(mib_name) == :ok do
       :ok
@@ -447,7 +596,13 @@ defmodule SNMP do
     end
   end
 
-  def resolve_object_name_to_oid(name) when is_atom(name) do
+  def resolve_object_name_to_oid(oid)
+      when is_list(oid),
+  do: oid
+
+  def resolve_object_name_to_oid(name)
+      when is_atom(name)
+  do
     try do
       with {:ok, [oid]} <- :snmpm.name_to_oid(name),
         do: {:ok, oid}
@@ -461,7 +616,8 @@ defmodule SNMP do
   end
 
   @doc """
-  Returns a keyword list containing the given SNMPv1/2c/3 credentials.
+  Returns a keyword list containing the given SNMPv1/2c/3
+  credentials.
 
   ## Example
 
@@ -532,7 +688,8 @@ defmodule SNMP do
 
   """
   @spec credential([atom | String.t])
-    :: snmp_credential | no_return
+    :: snmp_credential
+     | no_return
   def credential(args) when is_list args do
     case args do
       [:v1, _] ->
@@ -553,7 +710,8 @@ defmodule SNMP do
   end
 
   @doc """
-  Returns a keyword list containing the given SNMPv1/2c community.
+  Returns a keyword list containing the given SNMPv1/2c
+  community.
 
   ## Example
 
@@ -565,7 +723,8 @@ defmodule SNMP do
 
   """
   @spec credential(:v1 | :v2c, String.t)
-    :: snmp_credential | no_return
+    :: snmp_credential
+     | no_return
   def credential(version, community)
 
   def credential(:v1, community) do
@@ -585,7 +744,8 @@ defmodule SNMP do
   end
 
   @doc """
-  Returns a keyword list containing the given SNMPv3 noAuthNoPriv credentials.
+  Returns a keyword list containing the given SNMPv3
+  noAuthNoPriv credentials.
 
   ## Example
 
@@ -594,7 +754,8 @@ defmodule SNMP do
 
   """
   @spec credential(:v3, :no_auth_no_priv, String.t)
-    :: snmp_credential | no_return
+    :: snmp_credential
+     | no_return
   def credential(version, sec_level, sec_name)
 
   def credential(:v3, :no_auth_no_priv, sec_name),
@@ -604,7 +765,8 @@ defmodule SNMP do
     }
 
   @doc """
-  Returns a keyword list containing the given SNMPv3 authNoPriv credentials.
+  Returns a keyword list containing the given SNMPv3
+  authNoPriv credentials.
 
   ## Example
 
@@ -625,12 +787,30 @@ defmodule SNMP do
       }
 
   """
-  @spec credential(:v3, :auth_no_priv, String.t, :md5|:sha, String.t)
-    :: snmp_credential | no_return
+  @spec credential(
+      :v3,
+      :auth_no_priv,
+      String.t,
+      :md5|:sha,
+      String.t
+    )
+    :: snmp_credential
+     | no_return
+  def credential(
+    version,
+    sec_level,
+    sec_name,
+    auth_proto,
+    auth_pass
+  )
 
-  def credential(version, sec_level, sec_name, auth_proto, auth_pass)
-
-  def credential(:v3, :auth_no_priv, sec_name, auth_proto, auth_pass)
+  def credential(
+    :v3,
+    :auth_no_priv,
+    sec_name,
+    auth_proto,
+    auth_pass
+  )
       when auth_proto in [:md5, :sha]
   do
     %USMCredential{
@@ -650,7 +830,8 @@ defmodule SNMP do
   defp priv_proto_to_snmpm_auth(_),    do: :usmNoPrivProtocol
 
   @doc """
-  Returns `t:snmp_credential/0` containing the given SNMPv3 authPriv credentials.
+  Returns `t:snmp_credential/0` containing the given SNMPv3
+  authPriv credentials.
 
   ## Examples
 
@@ -695,15 +876,41 @@ defmodule SNMP do
       }
 
   """
-  @spec credential(:v3, :auth_priv, String.t, :md5|:sha, String.t, :des|:aes, String.t)
-    :: snmp_credential | no_return
-  def credential(version, sec_level, sec_name, auth_proto, auth_pass, priv_proto, priv_pass)
+  @spec credential(
+      :v3,
+      :auth_priv,
+      String.t,
+      :md5|:sha,
+      String.t,
+      :des|:aes,
+      String.t
+  )
+    :: snmp_credential
+     | no_return
+  def credential(
+    version,
+    sec_level,
+    sec_name,
+    auth_proto,
+    auth_pass,
+    priv_proto,
+    priv_pass
+  )
 
-  def credential(:v3, :auth_priv, sec_name, auth_proto, auth_pass, priv_proto, priv_pass)
+  def credential(
+    :v3,
+    :auth_priv,
+    sec_name,
+    auth_proto,
+    auth_pass,
+    priv_proto,
+    priv_pass
+  )
       when auth_proto in [:md5, :sha]
        and priv_proto in [:des, :aes]
   do
     # http://erlang.org/doc/man/snmpm.html#register_usm_user-3
+
     %USMCredential{
       sec_level: :authPriv,
       sec_name:  :binary.bin_to_list(sec_name),
@@ -723,7 +930,9 @@ defmodule SNMP do
       "1.3.6.1.2.1.1.5.0"
 
   """
-  @spec list_oid_to_string([non_neg_integer]) :: String.t | no_return
+  @spec list_oid_to_string([non_neg_integer])
+    :: String.t
+     | no_return
   def list_oid_to_string(oid) when is_list(oid),
     do: Enum.join(oid, ".")
 
@@ -736,7 +945,9 @@ defmodule SNMP do
       [1,3,6,1,2,1,1,5,0]
 
   """
-  @spec string_oid_to_list(String.t) :: [non_neg_integer] | no_return
+  @spec string_oid_to_list(String.t)
+    :: [non_neg_integer]
+     | no_return
   def string_oid_to_list(oid) when is_binary oid do
     oid
     |> String.split(".", [trim: true])

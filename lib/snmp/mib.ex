@@ -12,15 +12,27 @@ defmodule SNMP.MIB do
   require Logger
 
   # http://erlang.org/doc/apps/snmp/snmp_mib_compiler.html#id77861
-  defp builtin_mibs,
-    do: ~w(SNMPv2-SMI RFC-1215 RFC-1212 SNMPv2-TC SNMPv2-CONF RFC1155-SMI)
+  defp builtin_mibs do
+    ~w(SNMPv2-SMI
+       RFC-1215
+       RFC-1212
+       SNMPv2-TC
+       SNMPv2-CONF
+       RFC1155-SMI
+    )
+  end
 
   defp get_obsolete_mib_rfc_tuple(mib_name) do
-    %{"IPV6-MIB"      => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
-      "IPV6-TC"       => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
-      "IPV6-ICMP-MIB" => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
-      "IPV6-TCP-MIB"  => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
-      "IPV6-UDP-MIB"  => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+    %{"IPV6-MIB"      =>
+        {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-TC"       =>
+        {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-ICMP-MIB" =>
+        {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-TCP-MIB"  =>
+        {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-UDP-MIB"  =>
+        {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
     }[String.upcase(mib_name)]
   end
 
@@ -35,7 +47,11 @@ defmodule SNMP.MIB do
     lines
     |> Stream.filter(&String.contains?(&1, "FROM"))
     |> Stream.flat_map(fn line ->
-      Regex.run(~r/\s?FROM\s+([^\s;]+)/, line, capture: :all_but_first) || []
+      mib_import = 
+        ~r/\s?FROM\s+([^\s;]+)/
+        |> Regex.run(line, capture: :all_but_first)
+
+      mib_import || []
     end)
     |> Enum.to_list
   end
@@ -48,7 +64,9 @@ defmodule SNMP.MIB do
         |> File.stream!
         |> get_imports_from_lines
         |> exclude_builtin_mibs
-        |> Stream.map(&Path.join(Path.dirname(mib_file), "#{&1}.mib"))
+        |> Stream.map(fn name ->
+          Path.join(Path.dirname(mib_file), "#{name}.mib")
+        end)
         |> Enum.map(& {mib_file, &1})
 
       rescue
@@ -68,7 +86,8 @@ defmodule SNMP.MIB do
   @type include_paths :: [String.t]
 
   @doc """
-  Compiles the MIB in `mib_file` with includes from `include_paths`.
+  Compile the MIB in `mib_file` with includes from
+  `include_paths`.
   """
   @spec compile(mib_file, include_paths) :: {:ok, term} | {:error, term}
   def compile(mib_file, include_paths) do
@@ -126,14 +145,15 @@ defmodule SNMP.MIB do
     do: Enum.group_by(imports, &elem(&1, 1), &elem(&1, 0))
 
   defp order_imports_by_dependency_chains(adjacency_map),
-    do: Utility.partition_poset_as_antichains_of_minimal_elements(adjacency_map)
+    do: Utility.topological_sort adjacency_map
 
   @type mib_dir :: String.t
 
   @doc """
   Compile all .mib files in `mib_dirs`.
   """
-  @spec compile_all([mib_dir]) :: [{mib_file, {:ok, term} | {:error, term}}]
+  @spec compile_all([mib_dir])
+    :: [{mib_file, {:ok, term} | {:error, term}}]
   def compile_all(mib_dirs) when is_list mib_dirs do
     mib_dirs
     |> list_files_with_mib_extension
@@ -147,7 +167,8 @@ defmodule SNMP.MIB do
   @doc """
   Compile all .mib files in `mib_dir`.
   """
-  @spec compile_all(mib_dir) :: [{mib_file, {:ok, term} | {:error, term}}]
+  @spec compile_all(mib_dir)
+    :: [{mib_file, {:ok, term} | {:error, term}}]
   def compile_all(mib_dir),
     do: compile_all([mib_dir])
 end

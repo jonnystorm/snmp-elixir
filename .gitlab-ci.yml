@@ -1,0 +1,27 @@
+image: elixir:latest
+
+variables:
+  MIX_ENV: test
+
+before_script:
+  - echo "Elixir v${ELIXIR_VERSION/v/} (compiled with OTP $OTP_VERSION)"
+  - export PLT_FILENAME=elixir-${ELIXIR_VERSION/v/}_${OTP_VERSION}.plt
+  - export PLT_TESTNAME=dialyxir_erlang-${OTP_VERSION}_elixir-${ELIXIR_VERSION/v/}_deps-${MIX_ENV}.plt
+  - export PLT_LOCATION=_build/$MIX_ENV/$PLT_TESTNAME
+  - mix local.hex --force
+  # Install dialyxir
+  - git clone https://github.com/jeremyjh/dialyxir.git
+  - cd dialyxir
+  - MIX_ENV=prod mix do compile, archive.build
+  - MIX_ENV=prod mix archive.install --force
+  - cd ..
+  # Download and stage pre-built PLT
+  - mkdir -p _build/$MIX_ENV
+  - wget -O $PLT_LOCATION https://gitlab.com/jonnystorm/gitlab-elixir-plts/raw/master/$PLT_FILENAME
+
+mix:
+  script:
+    - mix do deps.get, deps.compile
+    - mix test
+    - mix dialyzer --halt-exit-status
+
