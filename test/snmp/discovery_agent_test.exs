@@ -15,8 +15,11 @@ defmodule SNMP.DiscoveryAgent.Test do
     test "agent engine id" do
       uri = URI.parse "snmp://127.0.0.1:6000"
 
+      expected =
+        :binary.bin_to_list SNMP.Utility.local_engine_id
+
       assert DiscoveryAgent.discover_engine_id(uri)
-        == 'snmp_discovery_agent_engine'
+        == expected
     end
   end
 end

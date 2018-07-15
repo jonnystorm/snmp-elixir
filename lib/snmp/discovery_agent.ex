@@ -1,7 +1,8 @@
 defmodule SNMP.DiscoveryAgent do
 
   @moduledoc """
-  Provides abstractions to SNMP engine discovery through snmp agent
+  Provides abstractions to SNMP engine discovery through
+  snmp agent
   """
 
   use GenServer
@@ -65,14 +66,17 @@ defmodule SNMP.DiscoveryAgent do
     config_fun =
       fn {k, v} -> :snmpa_conf.agent_entry(k, v) end
 
-     write_fun =
-       &:snmpa_conf.write_agent_config('snmp/agent', &1)
+    write_fun =
+      &:snmpa_conf.write_agent_config('snmp/agent', &1)
+
+    init_engine_id =
+      :binary.bin_to_list SNMP.Utility.local_engine_id
 
     [ intAgentTransports: [
         transportDomainUdpIpv4: {127,0,0,1},
         transportDomainUdpIpv6: {0,0,0,0,0,0,0,1}
       ],
-      snmpEngineID: 'snmp_discovery_agent_engine',
+      snmpEngineID: init_engine_id,
       intAgentUDPPort: 6000,
       snmpEngineMaxMessageSize: 484,
     ] |> do_seed_config(agent_opts, config_fun, write_fun)
