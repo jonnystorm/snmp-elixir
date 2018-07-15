@@ -1,12 +1,11 @@
 # snmp-elixir
 
-[![Build Status](https://travis-ci.org/jonnystorm/snmp-elixir.svg?branch=master)](https://travis-ci.org/jonnystorm/snmp-elixir)
-([graphs](http://scribu.github.io/travis-stats/#jonnystorm/snmp-elixir/master))
+[![Build Status](https://gitlab.com/jonnystorm/snmp-elixir/badges/master/pipeline.svg)](https://gitlab.com/jonnystorm/snmp-elixir/commits/master)
 
 An SNMP client library for Elixir.
 
 This is my effort to replace the terrible but useful
-[net-snmp-elixir](https://github.com/jonnystorm/net-snmp-elixir) with a
+[net-snmp-elixir](https://gitlab.com/jonnystorm/net-snmp-elixir) with a
 facile Elixir wrapper for OTP's harrowing SNMP API.
 
 Many thanks to Dave Martin for his
@@ -37,7 +36,7 @@ For details, please see [Why Optimistic Merging Works Better](http://hintjens.co
 * USM engine discovery
 * SNMP tables
 * ~~MIB name resolution~~
-* Basic SNMP operations (~~GET~~, SET)
+* Basic SNMP operations (~~GET~~, ~~GET-NEXT~~, ~~WALK~~, SET)
 * Process management
 * Make it decent
 
