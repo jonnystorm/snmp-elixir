@@ -13,14 +13,18 @@ defmodule SNMP.Utility.Test do
   #
   #     [[b, c, e], [a, d]]
   #
-  test "Partitions a strict poset as maximal antichains of minimal elements" do
+  test """
+      Partitions a strict poset as maximal antichains of
+      minimal elements
+  """
+  do
     adjacencies =
       %{:e => [],
         :b => [:d, :a],
         :c => [:a],
       }
 
-    assert partition_poset_as_antichains_of_minimal_elements(adjacencies) ==
+    assert topological_sort(adjacencies) ==
       [[:b, :c, :e], [:a, :d]]
   end
 
@@ -38,8 +42,8 @@ defmodule SNMP.Utility.Test do
         :c => [:b],
       }
 
-    assert_raise RuntimeError, "detected cycle in subset: [:a, :b, :c]", fn ->
-      partition_poset_as_antichains_of_minimal_elements(adjacencies)
-    end
+    assert_raise RuntimeError,
+      "detected cycle in subset: [:a, :b, :c]",
+      fn -> topological_sort(adjacencies) end
   end
 end
