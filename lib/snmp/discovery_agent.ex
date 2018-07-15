@@ -7,12 +7,15 @@ defmodule SNMP.DiscoveryAgent do
   use GenServer
   require Logger
 
-  def start_link(state \\ [], opts \\ []) do
-    GenServer.start_link(__MODULE__, state, [name: __MODULE__] ++ opts)
+  def start_link(state \\ [], opts0 \\ []) do
+    opts = [{:name, __MODULE__}|opts0]
+
+    GenServer.start_link(__MODULE__, state, opts)
   end
 
   def init(opts) do
-    _ = GenServer.cast(self(), {:seed_and_start_agent, opts})
+    _ =
+      GenServer.cast(self(), {:seed_and_start_agent, opts})
 
     {:ok, []}
   end
@@ -38,15 +41,15 @@ defmodule SNMP.DiscoveryAgent do
   end
 
   def seed_config(opts) do
-    seed_agent_config(opts)
-    seed_standard_config(opts)
+    seed_agent_config opts
+    seed_standard_config opts
 
     [ &:snmpa_conf.write_community_config/2,
       &:snmpa_conf.write_usm_config/2,
       &:snmpa_conf.write_context_config/2,
       &:snmpa_conf.write_notify_config/2,
 
-    ] |> Enum.map(fn fun -> :ok = fun.('snmp/agent', []) end)
+    ] |> Enum.map(fn f -> :ok = f.('snmp/agent', []) end)
   end
 
   defp do_seed_config(opts, default_opts, config_fun, write_fun) do
@@ -59,8 +62,11 @@ defmodule SNMP.DiscoveryAgent do
 
   def seed_agent_config(agent_opts \\ [])
   def seed_agent_config(agent_opts) do
-    config_fun = fn {k, v} -> :snmpa_conf.agent_entry(k, v) end
-     write_fun = &:snmpa_conf.write_agent_config('snmp/agent', &1)
+    config_fun =
+      fn {k, v} -> :snmpa_conf.agent_entry(k, v) end
+
+     write_fun =
+       &:snmpa_conf.write_agent_config('snmp/agent', &1)
 
     [ intAgentTransports: [
         transportDomainUdpIpv4: {127,0,0,1},
@@ -78,8 +84,11 @@ defmodule SNMP.DiscoveryAgent do
 
   def seed_standard_config(standard_opts \\ [])
   def seed_standard_config(standard_opts) do
-    config_fun = fn {k, v} -> :snmpa_conf.standard_entry(k, v) end
-     write_fun = &:snmpa_conf.write_standard_config('snmp/agent', &1)
+    config_fun =
+      fn {k, v} -> :snmpa_conf.standard_entry(k, v) end
+
+     write_fun =
+       &:snmpa_conf.write_standard_config('snmp/agent', &1)
 
     [ sysName: 'Discovery agent',
       sysDescr: 'Discovery agent',
@@ -88,6 +97,7 @@ defmodule SNMP.DiscoveryAgent do
       sysObjectID: [3,6,1,4,1,193,19],
       sysServices: 72,
       snmpEnableAuthenTraps: :disabled,
+
     ] |> do_seed_config(standard_opts, config_fun, write_fun)
 
     config = :snmpa_conf.read_standard_config('snmp/agent')
@@ -135,7 +145,11 @@ defmodule SNMP.DiscoveryAgent do
       )
 
     {:ok, _} =
-      :snmp_view_based_acm_mib.add_sec2group(:usm, '', 'discovery_group')
+      :snmp_view_based_acm_mib.add_sec2group(
+        :usm,
+        '',
+        'discovery_group'
+      )
 
     {:ok, _} =
       :snmp_view_based_acm_mib.add_view_tree_fam(
@@ -157,12 +171,19 @@ defmodule SNMP.DiscoveryAgent do
 
   def discover_engine_id(uri, opts \\ [])
   def discover_engine_id(uri, opts) do
-    clean_opts = Enum.reject(opts, fn({_k, v}) -> is_nil(v) end)
+    clean_opts =
+      Enum.reject(opts, fn({_k, v}) -> is_nil(v) end)
 
-    GenServer.call(__MODULE__, {:discover_engine_id, uri, clean_opts})
+    msg = {:discover_engine_id, uri, clean_opts}
+
+    GenServer.call(__MODULE__, msg)
   end
 
-  def handle_call({:discover_engine_id, uri, opts_input}, _from, state) do
+  def handle_call(
+    {:discover_engine_id, uri, opts_input},
+    _from,
+    state
+  ) do
     default_opts = [
       port: uri.port || 161,
       transport: :transportDomainUdpIpv4,
@@ -170,8 +191,8 @@ defmodule SNMP.DiscoveryAgent do
       notification: :coldStart,
     ]
 
-    opts = Keyword.merge(default_opts, opts_input)
-    ip_string = String.replace(uri.host, ".", "_")
+    opts       = Keyword.merge(default_opts, opts_input)
+    ip_string  = String.replace(uri.host, ".", "_")
     agent_name = to_charlist "discovery_agent_#{ip_string}"
     erl_ip_address =
       uri.host
@@ -182,7 +203,7 @@ defmodule SNMP.DiscoveryAgent do
       :snmp_target_mib.add_addr(
         agent_name,
         opts[:transport],
-        {erl_ip_address, uri.port},
+        {erl_ip_address, opts[:port]},
         opts[:timeout],
         0,
         '',
@@ -192,7 +213,8 @@ defmodule SNMP.DiscoveryAgent do
         2048
       )
 
-    {:ok, engine_id} = :snmpa.discovery(agent_name, opts[:notification])
+    {:ok, engine_id} =
+      :snmpa.discovery(agent_name, opts[:notification])
 
     {:reply, engine_id, state}
   end
