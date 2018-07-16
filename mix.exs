@@ -66,6 +66,7 @@ defmodule SNMP.Mixfile do
     [ env: [
         mib_cache: "/tmp/snmp_ex/mibs",
         mib_sources: ["/usr/share/snmp/mibs"],
+        snmp_conf_dir: "/tmp/snmp_ex/conf",
       ],
     ] ++ get_applications(System.version)
   end

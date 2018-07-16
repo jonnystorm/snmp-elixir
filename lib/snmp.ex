@@ -82,11 +82,10 @@ defmodule SNMP do
     do: Application.get_env(:snmp_ex, :mib_sources)
 
   defp update_mib_cache do
-    cache_dir = mib_cache()
+    cache_dir   = mib_cache()
     source_dirs = mib_sources()
 
     _ = File.mkdir_p cache_dir
-
     _ =
       source_dirs
       |> Stream.map(&Path.expand/1)
@@ -112,6 +111,7 @@ defmodule SNMP do
 
   def start do
     :ok = :snmpm.start
+
     {:ok, _pid} = DiscoveryAgent.start_link
 
     module = :snmpm_user_default
@@ -176,7 +176,7 @@ defmodule SNMP do
   defp resolve_host_in_uri(uri) do
     {:ok, netaddr} = resolve_host_to_netaddr uri.host
 
-    %URI{uri | host: "#{netaddr}"}
+    %URI{uri | host: "#{NetAddr.address(netaddr)}"}
   end
 
   defp get_transport_from_netaddr(%NetAddr.IPv4{}),

@@ -21,28 +21,34 @@ defmodule SNMP.DiscoveryAgent do
     {:ok, []}
   end
 
-  defp mandatory_config_files do
-    [ "snmp/agent/agent.conf",
-      "snmp/agent/standard.conf",
-      "snmp/agent/usm.conf",
-      "snmp/agent/community.conf",
-    ]
+  defp agent_dir do
+    :snmp_ex
+    |> Application.get_env(:snmp_conf_dir)
+    |> Path.expand
+    |> Path.join("agent")
   end
 
   def handle_cast({:seed_and_start_agent, opts}, state) do
-    # TODO: Reverting this check breaks tests; why?
-    #
-    #unless Enum.all?(mandatory_config_files(), &File.exists?/1) do
-      _ = seed_config(opts)
-    #end
-    
+    agent_dir()
+    |> Path.join("db")
+    |> File.mkdir_p!
+
+    _ =
+      [ "#{agent_dir()}/agent.conf",
+        "#{agent_dir()}/standard.conf",
+        "#{agent_dir()}/usm.conf",
+        "#{agent_dir()}/community.conf",
+
+      ] |> Enum.map(&File.touch!/1)
+
+    _ = seed_config(opts)
     _ = start_agent()
 
     {:noreply, state}
   end
 
   def seed_config(opts) do
-    seed_agent_config opts
+    seed_agent_config    opts
     seed_standard_config opts
 
     [ &:snmpa_conf.write_community_config/2,
@@ -50,7 +56,9 @@ defmodule SNMP.DiscoveryAgent do
       &:snmpa_conf.write_context_config/2,
       &:snmpa_conf.write_notify_config/2,
 
-    ] |> Enum.map(fn f -> :ok = f.('snmp/agent', []) end)
+    ] |> Enum.map(fn fun ->
+      :ok = fun.('#{agent_dir()}', [])
+    end)
   end
 
   defp do_seed_config(opts, default_opts, config_fun, write_fun) do
@@ -67,7 +75,7 @@ defmodule SNMP.DiscoveryAgent do
       fn {k, v} -> :snmpa_conf.agent_entry(k, v) end
 
     write_fun =
-      &:snmpa_conf.write_agent_config('snmp/agent', &1)
+      &:snmpa_conf.write_agent_config('#{agent_dir()}', &1)
 
     init_engine_id =
       :binary.bin_to_list SNMP.Utility.local_engine_id
@@ -79,9 +87,11 @@ defmodule SNMP.DiscoveryAgent do
       snmpEngineID: init_engine_id,
       intAgentUDPPort: 6000,
       snmpEngineMaxMessageSize: 484,
+
     ] |> do_seed_config(agent_opts, config_fun, write_fun)
 
-    config = :snmpa_conf.read_agent_config('snmp/agent')
+    config =
+      :snmpa_conf.read_agent_config('#{agent_dir()}')
 
     :ok = Logger.info("SNMP agent.conf created - #{inspect config}")
   end
@@ -92,7 +102,7 @@ defmodule SNMP.DiscoveryAgent do
       fn {k, v} -> :snmpa_conf.standard_entry(k, v) end
 
      write_fun =
-       &:snmpa_conf.write_standard_config('snmp/agent', &1)
+       &:snmpa_conf.write_standard_config('#{agent_dir()}', &1)
 
     [ sysName: 'Discovery agent',
       sysDescr: 'Discovery agent',
@@ -104,7 +114,8 @@ defmodule SNMP.DiscoveryAgent do
 
     ] |> do_seed_config(standard_opts, config_fun, write_fun)
 
-    config = :snmpa_conf.read_standard_config('snmp/agent')
+    config =
+      :snmpa_conf.read_standard_config('#{agent_dir()}')
 
     :ok = Logger.info("SNMP standard.conf created - #{inspect config}")
   end
@@ -118,9 +129,9 @@ defmodule SNMP.DiscoveryAgent do
           originating: [enable: true],
           terminating: [enable: true]
         ],
-        db_dir: 'snmp/agent/db',
+        db_dir: '#{agent_dir()}/db',
         db_init_error: :create_db_and_dir,
-        config: [dir: 'snmp/agent'],
+        config: [dir: '#{agent_dir()}'],
 
       ] |> :snmpa_supervisor.start_master_sup
 
@@ -189,9 +200,9 @@ defmodule SNMP.DiscoveryAgent do
     state
   ) do
     default_opts = [
-      port: uri.port || 161,
-      transport: :transportDomainUdpIpv4,
-      timeout: 2000,
+      port:         uri.port || 161,
+      transport:    :transportDomainUdpIpv4,
+      timeout:      2000,
       notification: :coldStart,
     ]
 

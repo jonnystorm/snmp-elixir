@@ -8,7 +8,7 @@ defmodule SNMP.Test do
   @moduletag :integrated
 
   @sysname_oid [1,3,6,1,2,1,1,5,0]
-  @sysname_value {@sysname_oid, :"OCTET STRING", 'new system name'}
+  @sysname_value {@sysname_oid, :"OCTET STRING", '680'}
 
   setup_all do
     SNMP.start
