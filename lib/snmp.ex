@@ -378,8 +378,12 @@ defmodule SNMP do
   defp sha_sum(string) when is_binary(string),
     do: :crypto.hash(:sha, string)
 
-  defp is_dotted_decimal(string),
+  defp is_dotted_decimal(string)
+      when is_binary(string),
     do: string =~ ~r/^\.?\d(\.\d)+$/
+
+  defp is_dotted_decimal(_string),
+    do: false
 
   defp normalize_to_oids([[]]),
     do: []
@@ -394,10 +398,16 @@ defmodule SNMP do
         is_dotted_decimal(object) ->
           [string_oid_to_list(object)|acc]
 
+        is_atom(object) ->
+          {:ok, oid} = resolve_object_name_to_oid object
+
+          [oid|acc]
+
         true ->
           atom = String.to_atom object
+          {:ok, oid} = resolve_object_name_to_oid atom
 
-          [resolve_object_name_to_oid(atom)|acc]
+          [oid|acc]
       end
     end)
     |> Enum.reverse
@@ -550,7 +560,7 @@ defmodule SNMP do
   def walk(object, agent, credential, options \\ [])
 
   def walk(object, agent, credential, options) do
-    base_oid = resolve_object_name_to_oid object
+    [base_oid] = normalize_to_oids [object]
 
     {base_oid ++ [0], nil, nil}
     |> Stream.iterate(fn last_result ->

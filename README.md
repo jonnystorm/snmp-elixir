@@ -12,6 +12,51 @@ Many thanks to Dave Martin for his
 [post](https://groups.google.com/forum/#!topic/elixir-lang-talk/lGWGXFoUVvc),
 without which I may never have bothered returning to this problem.
 
+## Usage
+```elixir
+iex> SNMP.start
+:ok
+iex> v2_cred = SNMP.credential [:v2c, "public"]
+%SNMP.CommunityCredential{
+  community: 'public',
+  sec_model: :v2c,
+  version: :v2
+}
+iex>
+iex> {:ok, base_oid} = SNMP.resolve_object_name_to_oid :sysName
+{:ok, [1, 3, 6, 1, 2, 1, 1, 5]}
+iex>
+iex> SNMP.get base_oid ++ [0], "an-snmp-host.local", v2_cred
+[
+  {[1, 3, 6, 1, 2, 1, 1, 5, 0], :"OCTET STRING", 'an-snmp-host'}
+]
+iex>
+iex> v3_cred =
+...>   SNMP.credential [
+...>     :v3,
+...>     :auth_priv,
+...>     "user",
+...>     :sha,
+...>     "authpass",
+...>     :aes,
+...>     "privpass",
+...>   ]
+%SNMP.USMCredential{
+  auth: :sha,
+  auth_pass: 'neij44N7cczEFDBzhSwQ',
+  priv: :aes,
+  priv_pass: '2Q5ZBXHhjGpWlVdYQxmO',
+  sec_level: :authPriv,
+  sec_model: :usm,
+  sec_name: 'nms',
+  version: :v3
+}
+iex> SNMP.walk("ipAddrTable", "an-snmp-host.local", v3_cred) |> Enum.take(1)
+[
+  {[1, 3, 6, 1, 2, 1, 4, 20, 1, 1, 192, 0, 2, 1], :IpAddress, [192, 0, 2, 1]}
+]
+```
+
 ## Why another wrapper?
 
 `net-snmp-elixir` was my experimental hack to get something that worked.
