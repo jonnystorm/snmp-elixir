@@ -26,17 +26,14 @@ Contributions that break the build will be reverted.
 
 For details, please see [Why Optimistic Merging Works Better](http://hintjens.com/blog:106).
 
-## What we're currently stuck on
-
-* USM engineID discovery (a la [RFC 3414](https://tools.ietf.org/html/rfc3414#section-4))
-
 ## TODO
 
-* SNMPv3 USM (~~noAuthNoPriv~~, ~~authNoPriv~~, ~~authPriv-DES~~, authPriv-AES128)
-* USM engine discovery
+* ~~SNMPv3 USM~~ (requires patched OTP; see issue #6)
+* ~~USM engine discovery~~
 * SNMP tables
 * ~~MIB name resolution~~
 * Basic SNMP operations (~~GET~~, ~~GET-NEXT~~, ~~WALK~~, SET)
+* Bulk SNMP operations
 * Process management
 * Make it decent
 
