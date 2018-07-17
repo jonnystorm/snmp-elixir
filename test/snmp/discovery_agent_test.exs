@@ -19,7 +19,7 @@ defmodule SNMP.DiscoveryAgent.Test do
         :binary.bin_to_list SNMP.Utility.local_engine_id
 
       assert DiscoveryAgent.discover_engine_id(uri)
-        == expected
+        == {:ok, expected}
     end
   end
 end

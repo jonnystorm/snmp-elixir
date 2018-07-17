@@ -184,6 +184,14 @@ defmodule SNMP.DiscoveryAgent do
       )
   end
 
+  @type uri  :: URI.t
+  @type opts :: Keyword.t
+
+  @type engine_id :: charlist()
+
+  @spec discover_engine_id(uri, opts)
+    :: {:ok, engine_id}
+     | {:error, any}
   def discover_engine_id(uri, opts \\ [])
   def discover_engine_id(uri, opts) do
     clean_opts =
@@ -191,7 +199,7 @@ defmodule SNMP.DiscoveryAgent do
 
     msg = {:discover_engine_id, uri, clean_opts}
 
-    GenServer.call(__MODULE__, msg)
+    GenServer.call(__MODULE__, msg, 60_000)
   end
 
   def handle_call(
@@ -199,14 +207,25 @@ defmodule SNMP.DiscoveryAgent do
     _from,
     state
   ) do
+    # OTP multiplies the below timeout by 10, then doubles
+    # it for each successive retry. Consequently, given an
+    # initial timeout of 100, OTP will first use a timeout
+    # of 1000, followed by a timeout of 2000, followed by a
+    # timeout of 4000, and so on. Whether this is all in
+    # milliseconds is unclear. It probably is milliseconds.
+    #
+    # For proof, please see https://github.com/jonnystorm/otp/blob/f6a862dcc515d8500097aac2b0f84e501d8d0968/lib/snmp/src/agent/snmpa_trap.erl#L631-L677
+    #
     default_opts = [
       port:         uri.port || 161,
       transport:    :transportDomainUdpIpv4,
-      timeout:      2000,
+      timeout:      1000,
+      retries:      2,
       notification: :coldStart,
     ]
 
     opts       = Keyword.merge(default_opts, opts_input)
+    timeout    = trunc(opts[:timeout] / 10)
     ip_string  = String.replace(uri.host, ".", "_")
     agent_name = to_charlist "discovery_agent_#{ip_string}"
     erl_ip_address =
@@ -219,8 +238,8 @@ defmodule SNMP.DiscoveryAgent do
         agent_name,
         opts[:transport],
         {erl_ip_address, opts[:port]},
-        opts[:timeout],
-        0,
+        timeout,
+        opts[:retries],
         '',
         'discovery_params',
         '',
@@ -228,9 +247,9 @@ defmodule SNMP.DiscoveryAgent do
         2048
       )
 
-    {:ok, engine_id} =
+    result =
       :snmpa.discovery(agent_name, opts[:notification])
 
-    {:reply, engine_id, state}
+    {:reply, result, state}
   end
 end

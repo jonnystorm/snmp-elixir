@@ -64,9 +64,10 @@ defmodule SNMP.Mixfile do
   def application do
     # Specify extra applications you'll use from Erlang/Elixir
     [ env: [
-        mib_cache: "/tmp/snmp_ex/mibs",
-        mib_sources: ["/usr/share/snmp/mibs"],
+        mib_sources:   ["/usr/share/snmp/mibs"],
+        mib_cache:     "/tmp/snmp_ex/mibs",
         snmp_conf_dir: "/tmp/snmp_ex/conf",
+        engine_discovery_timeout: 1000,
       ],
     ] ++ get_applications(System.version)
   end

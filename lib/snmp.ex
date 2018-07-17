@@ -344,18 +344,18 @@ defmodule SNMP do
   end
 
   defp discover_engine_id(uri, target_name) do
-    result = :snmpm_config.get_agent_engine_id target_name
+    timeout =
+      Application.get_env :snmp_ex,
+        :engine_discovery_timeout
 
-    engine_id =
-      case result do
-        {:ok, engine_id} ->
-          engine_id
-
-        _ ->
-          DiscoveryAgent.discover_engine_id uri
-      end
-
-    :binary.list_to_bin(engine_id)
+    with {:error, _} <-
+           :snmpm_config.get_agent_engine_id(target_name)
+    do
+      DiscoveryAgent.discover_engine_id(
+        uri,
+        timeout: timeout
+      )
+    end
   end
 
   defp warmup_engine_boots_and_engine_time(
@@ -474,13 +474,19 @@ defmodule SNMP do
 
     discover_fun =
       fn ->
-        discover_engine_id(uri, target)
+        case discover_engine_id(uri, target)
+        do
+          {:ok,  eid} ->
+            eid
+
+          {:error, _} ->
+            Utility.local_engine_id
+            |> :binary.bin_to_list
+        end
       end
 
     engine_id =
-      options
-      |> Keyword.get_lazy(:engine_id, discover_fun)
-      |> :binary.bin_to_list
+      Keyword.get_lazy(options, :engine_id, discover_fun)
 
     with :ok <-
            register_usm_user(credential, engine_id),
