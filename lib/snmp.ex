@@ -167,18 +167,19 @@ defmodule SNMP do
   defp resolve_host_to_netaddr(host) do
     with {:error, _} <- parse_ip(host),
          {:ok,   ip} <- get_host_by_name(host),
-         {:error, _} <- parse_ip(ip)
-    do
-      :ok = Logger.error("Unable to resolve host #{inspect host}")
 
-      {:error, :einval}
-    end
+      do: parse_ip ip
   end
 
   defp resolve_host_in_uri(uri) do
-    {:ok, netaddr} = resolve_host_to_netaddr uri.host
+    with {:ok, netaddr}
+           <- resolve_host_to_netaddr(uri.host)
+    do
+      ip_uri =
+        %{uri|host: "#{NetAddr.address(netaddr)}"}
 
-    %URI{uri | host: "#{NetAddr.address(netaddr)}"}
+      {:ok, ip_uri}
+    end
   end
 
   defp get_transport_from_netaddr(%NetAddr.IPv4{}),
@@ -462,61 +463,60 @@ defmodule SNMP do
     credential,
     options
   ) do
-    uri =
-      agent
-      |> normalize_to_uri
-      |> resolve_host_in_uri
-
-    oids        = normalize_to_oids(objects)
-    target      = generate_target_name(uri, credential)
-    erl_context =
-      options
-      |> Keyword.get(:context, "")
-      |> :binary.bin_to_list
-
-    discover_fun =
-      fn ->
-        case discover_engine_id(uri, target)
-        do
-          {:ok,  eid} ->
-            eid
-
-          {:error, _} ->
-            Utility.local_engine_id
-            |> :binary.bin_to_list
-        end
-      end
-
-    engine_id =
-      Keyword.get_lazy(options, :engine_id, discover_fun)
-
-    with :ok <-
-           register_usm_user(credential, engine_id),
-
-         :ok <-
-           register_agent(
-             target,
-             uri,
-             credential,
-             engine_id
-           ),
-
-         :ok <-
-           warmup_engine_boots_and_engine_time(
-             engine_id,
-             target
-           )
+    with {:ok, uri} <-
+           agent
+           |> normalize_to_uri
+           |> resolve_host_in_uri
     do
-      result =
-        _perform_snmp_op(
-          op,
-          oids,
-          target,
-          erl_context,
-          get_timeout()
-        )
+      oids        = normalize_to_oids objects
+      target      = generate_target_name(uri, credential)
+      erl_context =
+        options
+        |> Keyword.get(:context, "")
+        |> :binary.bin_to_list
 
-      groom_snmp_result result
+      discover_fun =
+        fn ->
+          case discover_engine_id(uri, target)
+          do
+            {:ok,  eid} -> :binary.list_to_bin eid
+            {:error, _} -> Utility.local_engine_id
+          end
+        end
+
+      engine_id =
+        options
+        |> Keyword.get_lazy(:engine_id, discover_fun)
+        |> :binary.bin_to_list
+
+      with :ok <-
+             register_usm_user(credential, engine_id),
+
+           :ok <-
+             register_agent(
+               target,
+               uri,
+               credential,
+               engine_id
+             ),
+
+           :ok <-
+             warmup_engine_boots_and_engine_time(
+               engine_id,
+               target
+             )
+      do
+        result =
+          _perform_snmp_op(
+            op,
+            oids,
+            target,
+            erl_context,
+            get_timeout()
+          )
+
+        groom_snmp_result result
+      end
     end
   end
 

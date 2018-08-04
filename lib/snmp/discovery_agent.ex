@@ -214,7 +214,8 @@ defmodule SNMP.DiscoveryAgent do
     # timeout of 4000, and so on. Whether this is all in
     # milliseconds is unclear. It probably is milliseconds.
     #
-    # For proof, please see https://github.com/jonnystorm/otp/blob/f6a862dcc515d8500097aac2b0f84e501d8d0968/lib/snmp/src/agent/snmpa_trap.erl#L631-L677
+    # For proof, please see
+    # https://github.com/jonnystorm/otp/blob/f6a862dcc515d8500097aac2b0f84e501d8d0968/lib/snmp/src/agent/snmpa_trap.erl#L631-L677
     #
     default_opts = [
       port:         uri.port || 161,

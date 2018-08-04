@@ -8,7 +8,13 @@ defmodule SNMP.Test do
   @moduletag :integrated
 
   @sysname_oid [1,3,6,1,2,1,1,5,0]
-  @sysname_value {@sysname_oid, :"OCTET STRING", '680'}
+  @sysname_value {@sysname_oid, :"OCTET STRING", 'new system name'}
+
+  # Presumably working agent, but has frequent troubles
+  @working_agent "demo.snmplabs.com"
+
+  # Optimistically, should a broken agent
+  @borking_agent "localhost:65535"
 
   setup_all do
     SNMP.start
@@ -49,17 +55,26 @@ defmodule SNMP.Test do
     ]
   end
 
-  defp get_sysname_with_engine_id(credential) do
+  defp get_sysname_with_engine_id(credential, agent) do
     get_sysname(
       credential,
+      agent,
       [engine_id: <<0x80004fb805636c6f75644dab22cc::14*8>>]
     )
   end
 
-  defp get_sysname(credential, opts \\ []) do
-    snmp_agent = "demo.snmplabs.com"
+  defp get_sysname(credential, agent, opts \\ []) do
+    SNMP.get(@sysname_oid, agent, credential, opts)
+  end
 
-    SNMP.get(@sysname_oid, snmp_agent, credential, opts)
+  test "Hostname resolution breaks gracefully" do
+    hostname = "x80004fb805636c6f75644dab22cc.local"
+    result =
+      :none
+      |> get_credential(:none)
+      |> get_sysname_with_engine_id(hostname)
+
+    assert result == {:error, :nxdomain}
   end
 
   describe "v3 GET noAuthNoPriv" do
@@ -68,18 +83,36 @@ defmodule SNMP.Test do
       result =
         :none
         |> get_credential(:none)
-        |> get_sysname_with_engine_id
+        |> get_sysname_with_engine_id(@working_agent)
 
       assert result == [@sysname_value]
+    end
+
+    test "timeout without engine discovery" do
+      result =
+        :none
+        |> get_credential(:none)
+        |> get_sysname_with_engine_id(@borking_agent)
+
+      assert result == {:error, :etimedout}
     end
 
     test "get with engine discovery" do
       result =
         :none
         |> get_credential(:none)
-        |> get_sysname
+        |> get_sysname(@working_agent)
 
       assert result == [@sysname_value]
+    end
+
+    test "timeout with engine discovery" do
+      result =
+        :none
+        |> get_credential(:none)
+        |> get_sysname(@borking_agent)
+
+      assert result == {:error, :etimedout}
     end
   end
 
@@ -88,19 +121,48 @@ defmodule SNMP.Test do
     test "get without engine discovery" do
       for auth <- [:md5, :sha]
       do
-        credential = get_credential(auth, :none)
+        result =
+          auth
+          |> get_credential(:none)
+          |> get_sysname_with_engine_id(@working_agent)
 
-        assert get_sysname_with_engine_id(credential) ==
-          [@sysname_value]
+        assert result == [@sysname_value]
+      end
+    end
+
+    test "timeout without engine discovery" do
+      for auth <- [:md5, :sha]
+      do
+        result =
+          auth
+          |> get_credential(:none)
+          |> get_sysname_with_engine_id(@borking_agent)
+
+        assert result == {:error, :etimedout}
       end
     end
 
     test "get with engine discovery" do
       for auth <- [:md5, :sha]
       do
-        credential = get_credential(auth, :none)
+        result =
+          auth
+          |> get_credential(:none)
+          |> get_sysname(@working_agent)
 
-        assert get_sysname(credential) == [@sysname_value]
+        assert result == [@sysname_value]
+      end
+    end
+
+    test "timeout with engine discovery" do
+      for auth <- [:md5, :sha]
+      do
+        result =
+          auth
+          |> get_credential(:none)
+          |> get_sysname(@borking_agent)
+
+        assert result == {:error, :etimedout}
       end
     end
   end
@@ -111,20 +173,51 @@ defmodule SNMP.Test do
       for auth <- [:md5, :sha],
           priv <- [:des, :aes]
       do
-        credential = get_credential(auth, priv)
+        result =
+          auth
+          |> get_credential(priv)
+          |> get_sysname_with_engine_id(@working_agent)
 
-        assert get_sysname_with_engine_id(credential) ==
-          [@sysname_value]
+        assert result == [@sysname_value]
       end
     end
 
-    test "get engine discovery" do
+    test "timeout without engine discovery" do
       for auth <- [:md5, :sha],
           priv <- [:des, :aes]
       do
-        credential = get_credential(auth, priv)
+        result =
+          auth
+          |> get_credential(priv)
+          |> get_sysname_with_engine_id(@borking_agent)
 
-        assert get_sysname(credential) == [@sysname_value]
+        assert result == {:error, :etimedout}
+      end
+    end
+
+    test "get with engine discovery" do
+      for auth <- [:md5, :sha],
+          priv <- [:des, :aes]
+      do
+        result =
+          auth
+          |> get_credential(priv)
+          |> get_sysname(@working_agent)
+
+        assert result == [@sysname_value]
+      end
+    end
+
+    test "timeout with engine discovery" do
+      for auth <- [:md5, :sha],
+          priv <- [:des, :aes]
+      do
+        result =
+          auth
+          |> get_credential(priv)
+          |> get_sysname(@borking_agent)
+
+        assert result == {:error, :etimedout}
       end
     end
   end
