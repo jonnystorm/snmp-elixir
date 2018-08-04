@@ -1,6 +1,7 @@
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the
+# Mozilla Public License, v. 2.0. If a copy of the MPL was
+# not distributed with this file, You can obtain one at
+# http://mozilla.org/MPL/2.0/.
 
 defmodule SNMP.MIB do
   @moduledoc """
@@ -40,7 +41,7 @@ defmodule SNMP.MIB do
     do: get_obsolete_mib_rfc_tuple(mib_name) != nil
 
   defp exclude_builtin_mibs(mibs) do
-    Enum.filter(mibs, & not &1 in builtin_mibs())
+    Enum.filter(mibs, & &1 not in builtin_mibs())
   end
 
   defp get_imports_from_lines(lines) do
@@ -89,12 +90,16 @@ defmodule SNMP.MIB do
   Compile the MIB in `mib_file` with includes from
   `include_paths`.
   """
-  @spec compile(mib_file, include_paths) :: {:ok, term} | {:error, term}
+  @spec compile(mib_file, include_paths)
+    :: {:ok, term}
+     | {:error, term}
   def compile(mib_file, include_paths) do
-    outdir = Path.dirname(mib_file)
+    outdir       = Path.dirname(mib_file)
     erl_outdir   = :binary.bin_to_list outdir
     erl_mib_file = :binary.bin_to_list mib_file
-    erl_include_paths = Enum.map(include_paths, &:binary.bin_to_list("#{&1}/"))
+    erl_include_paths =
+      Enum.map(include_paths, &:binary.bin_to_list("#{&1}/"))
+
     options = [
       :relaxed_row_name_assign_check,  # added this on a lark; mistake?
       warnings: false,
@@ -106,7 +111,7 @@ defmodule SNMP.MIB do
     mib_name = Path.basename(mib_file, ".mib")
 
     if is_obsolete_mib(mib_name) do
-      {rfc, link} = get_obsolete_mib_rfc_tuple(mib_name)
+      {rfc, link} = get_obsolete_mib_rfc_tuple mib_name
 
       :ok = Logger.warn("Compiling obsolete MIB #{inspect mib_name}... This may not work. Please see #{rfc} at #{link} for details")
     end
@@ -152,8 +157,8 @@ defmodule SNMP.MIB do
   @doc """
   Compile all .mib files in `mib_dirs`.
   """
-  @spec compile_all([mib_dir])
-    :: [{mib_file, {:ok, term} | {:error, term}}]
+  @spec compile_all(mib_dir | [mib_dir, ...])
+    :: [{mib_file, {:ok, term} | {:error, term}}, ...]
   def compile_all(mib_dirs) when is_list mib_dirs do
     mib_dirs
     |> list_files_with_mib_extension
@@ -164,11 +169,6 @@ defmodule SNMP.MIB do
     |> Enum.map(&{&1, compile(&1, mib_dirs)})
   end
 
-  @doc """
-  Compile all .mib files in `mib_dir`.
-  """
-  @spec compile_all(mib_dir)
-    :: [{mib_file, {:ok, term} | {:error, term}}]
   def compile_all(mib_dir),
     do: compile_all([mib_dir])
 end

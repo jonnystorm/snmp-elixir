@@ -4,7 +4,7 @@ defmodule SNMP.Mixfile do
   def project do
     [ app: :snmp_ex,
       version: "0.1.1",
-      elixir: "~> 1.3",
+      elixir: "~> 1.6",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
       deps: deps(),
@@ -27,49 +27,22 @@ defmodule SNMP.Mixfile do
     ]
   end
 
-  defp is_later_than(version_string1, version_string2) do
-    # This is a kludge, but I think it will do.
-    #
-    latest =
-      [version_string1, version_string2]
-      |> Enum.sort_by(fn string ->
-        string
-        |> String.split(~r/[^0-9]/, trim: true)
-        |> Enum.map(&String.to_integer/1)
-      end)
-      |> List.last
-
-    (latest == version_string1)
-      && (version_string1 != version_string2)
-  end
-
-  defp get_applications(version) do
-    # Support Elixir < 1.4
-    #
-    applications =
-      [ :logger,
-        :netaddr_ex,
-      ]
-
-    if version |> is_later_than("1.3.4") do
-      [extra_applications: applications]
-    else
-      [applications: applications]
-    end
-  end
-
   # Configuration for the OTP application
   #
   # Type "mix help compile.app" for more information
   def application do
     # Specify extra applications you'll use from Erlang/Elixir
-    [ env: [
+    [ extra_applications: [
+        :logger,
+        :netaddr_ex,
+      ],
+      env: [
         mib_sources:   ["/usr/share/snmp/mibs"],
         mib_cache:     "/tmp/snmp_ex/mibs",
         snmp_conf_dir: "/tmp/snmp_ex/conf",
         engine_discovery_timeout: 1000,
       ],
-    ] ++ get_applications(System.version)
+    ]
   end
 
   # Dependencies can be Hex packages:

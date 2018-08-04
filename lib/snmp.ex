@@ -1,6 +1,7 @@
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# This Source Code Form is subject to the terms of the
+# Mozilla Public License, v. 2.0. If a copy of the MPL was
+# not distributed with this file, You can obtain one at
+# http://mozilla.org/MPL/2.0/.
 
 defmodule SNMP do
   @moduledoc """
@@ -17,8 +18,9 @@ defmodule SNMP do
 
   require Logger
 
-  @type snmp_credential :: CommunityCredential.t
-                         | USMCredential.t
+  @type snmp_credential
+    :: CommunityCredential.t
+     | USMCredential.t
 
   defmodule CommunityCredential do
     defstruct [

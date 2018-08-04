@@ -9,9 +9,17 @@ before_script:
   - export PLT_TESTNAME=dialyxir_erlang-${OTP_VERSION}_elixir-${ELIXIR_VERSION/v/}_deps-${MIX_ENV}.plt
   - export PLT_LOCATION=_build/$MIX_ENV/$PLT_TESTNAME
   - mix local.hex --force
+  - mix local.rebar --force
   # Install dialyxir
+  - git clone https://github.com/asummers/erlex.git
+  - cd erlex
+  - mix deps.get
+  - mix do compile, archive.build
+  - mix archive.install --force
+  - cd ..
   - git clone https://github.com/jeremyjh/dialyxir.git
   - cd dialyxir
+  - mix deps.get
   - MIX_ENV=prod mix do compile, archive.build
   - MIX_ENV=prod mix archive.install --force
   - cd ..
