@@ -115,10 +115,21 @@ defmodule SNMP do
     # snmpm configuration taken from
     # https://github.com/erlang/otp/blob/40de8cc4452dfdc5d390c93860870d4bf4605eb9/lib/snmp/src/manager/snmpm.erl#L156-L196
 
+    mib_cache =
+      Application.get_env(:snmp_ex, :mib_cache)
+
+    snmp_conf_dir =
+      Application.get_env(:snmp_ex, :snmp_conf_dir)
+
+    snmpm_conf_dir =
+      Application.get_env(:snmp_ex, :snmpm_conf_dir)
+
+    _ = File.mkdir_p! mib_cache
+    _ = File.mkdir_p! snmp_conf_dir
+    _ = File.mkdir_p! snmpm_conf_dir
+
     snmpm_conf_dir_erl =
-      :snmp_ex
-      |> Application.get_env(:snmpm_conf_dir)
-      |> :binary.bin_to_list
+      :binary.bin_to_list snmpm_conf_dir
 
     :ok =
       :snmp_config.write_manager_config(
