@@ -112,7 +112,32 @@ defmodule SNMP do
   end
 
   def start do
-    :ok = :snmpm.start
+    # snmpm configuration taken from
+    # https://github.com/erlang/otp/blob/40de8cc4452dfdc5d390c93860870d4bf4605eb9/lib/snmp/src/manager/snmpm.erl#L156-L196
+
+    snmpm_conf_dir_erl =
+      :snmp_ex
+      |> Application.get_env(:snmpm_conf_dir)
+      |> :binary.bin_to_list
+
+    :ok =
+      :snmp_config.write_manager_config(
+        snmpm_conf_dir_erl,
+        '',
+        [ port: 5000,
+          engine_id: 'mgrEngine',
+          max_message_size: 484,
+        ]
+      )
+
+    :ok =
+      :snmpm.start [
+        versions: [:v1, :v2, :v3],
+        config: [
+             dir: snmpm_conf_dir_erl,
+          db_dir: snmpm_conf_dir_erl,
+        ],
+      ]
 
     {:ok, _pid} = DiscoveryAgent.start_link
 
@@ -122,6 +147,7 @@ defmodule SNMP do
 
     _ = update_mib_cache()
     _ = load_cached_mibs()
+
     :ok
   end
 
