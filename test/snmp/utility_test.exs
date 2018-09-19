@@ -16,16 +16,10 @@ defmodule SNMP.Utility.Test do
   test """
       Partitions a strict poset as maximal antichains of
       minimal elements
-  """
-  do
-    adjacencies =
-      %{:e => [],
-        :b => [:d, :a],
-        :c => [:a],
-      }
+  """ do
+    adjacencies = %{:e => [], :b => [:d, :a], :c => [:a]}
 
-    assert topological_sort(adjacencies) ==
-      [[:b, :c, :e], [:a, :d]]
+    assert topological_sort(adjacencies) == [[:b, :c, :e], [:a, :d]]
   end
 
   # Raises on
@@ -36,14 +30,10 @@ defmodule SNMP.Utility.Test do
   #         '->:b
   #
   test "Raises when a cycle is detected" do
-    adjacencies =
-      %{:a => [:c],
-        :b => [:a],
-        :c => [:b],
-      }
+    adjacencies = %{:a => [:c], :b => [:a], :c => [:b]}
 
     assert_raise RuntimeError,
-      "detected cycle in subset: [:a, :b, :c]",
-      fn -> topological_sort(adjacencies) end
+                 "detected cycle in subset: [:a, :b, :c]",
+                 fn -> topological_sort(adjacencies) end
   end
 end

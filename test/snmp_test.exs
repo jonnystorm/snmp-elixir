@@ -7,7 +7,7 @@ defmodule SNMP.Test do
 
   @moduletag :integrated
 
-  @sysname_oid [1,3,6,1,2,1,1,5,0]
+  @sysname_oid [1, 3, 6, 1, 2, 1, 1, 5, 0]
   @sysname_value {@sysname_oid, :"OCTET STRING", 'new system name'}
 
   # Presumably working agent, but has frequent troubles
@@ -17,49 +17,47 @@ defmodule SNMP.Test do
   @borking_agent "localhost:65535"
 
   setup_all do
-    SNMP.start
+    {:ok, _pid} = SNMP.start_link()
+    :ok
   end
 
   defp get_credential(:none, :none) do
-    SNMP.credential [
+    SNMP.credential([
       :v3,
       :no_auth_no_priv,
-      "usr-none-none",
-    ]
+      "usr-none-none"
+    ])
   end
 
   defp get_credential(auth, :none)
-      when auth in [:md5, :sha]
-  do
-    SNMP.credential [
+       when auth in [:md5, :sha] do
+    SNMP.credential([
       :v3,
       :auth_no_priv,
-      "usr-#{Atom.to_string auth}-none",
+      "usr-#{Atom.to_string(auth)}-none",
       auth,
-      "authkey1",
-    ]
+      "authkey1"
+    ])
   end
 
   defp get_credential(auth, priv)
-      when auth in [:md5, :sha]
-       and priv in [:des, :aes]
-  do
-    SNMP.credential [
+       when auth in [:md5, :sha] and priv in [:des, :aes] do
+    SNMP.credential([
       :v3,
       :auth_priv,
-      "usr-#{Atom.to_string auth}-#{Atom.to_string priv}",
+      "usr-#{Atom.to_string(auth)}-#{Atom.to_string(priv)}",
       auth,
       "authkey1",
       priv,
-      "privkey1",
-    ]
+      "privkey1"
+    ])
   end
 
   defp get_sysname_with_engine_id(credential, agent) do
     get_sysname(
       credential,
       agent,
-      [engine_id: <<0x80004fb805636c6f75644dab22cc::14*8>>]
+      engine_id: <<0x80004FB805636C6F75644DAB22CC::14*8>>
     )
   end
 
@@ -69,6 +67,7 @@ defmodule SNMP.Test do
 
   test "Hostname resolution breaks gracefully" do
     hostname = "x80004fb805636c6f75644dab22cc.local"
+
     result =
       :none
       |> get_credential(:none)
@@ -78,7 +77,6 @@ defmodule SNMP.Test do
   end
 
   describe "v3 GET noAuthNoPriv" do
-
     test "get without engine discovery" do
       result =
         :none
@@ -117,10 +115,8 @@ defmodule SNMP.Test do
   end
 
   describe "v3 get authNoPriv" do
-
     test "get without engine discovery" do
-      for auth <- [:md5, :sha]
-      do
+      for auth <- [:md5, :sha] do
         result =
           auth
           |> get_credential(:none)
@@ -131,8 +127,7 @@ defmodule SNMP.Test do
     end
 
     test "timeout without engine discovery" do
-      for auth <- [:md5, :sha]
-      do
+      for auth <- [:md5, :sha] do
         result =
           auth
           |> get_credential(:none)
@@ -143,8 +138,7 @@ defmodule SNMP.Test do
     end
 
     test "get with engine discovery" do
-      for auth <- [:md5, :sha]
-      do
+      for auth <- [:md5, :sha] do
         result =
           auth
           |> get_credential(:none)
@@ -155,8 +149,7 @@ defmodule SNMP.Test do
     end
 
     test "timeout with engine discovery" do
-      for auth <- [:md5, :sha]
-      do
+      for auth <- [:md5, :sha] do
         result =
           auth
           |> get_credential(:none)
@@ -168,11 +161,9 @@ defmodule SNMP.Test do
   end
 
   describe "v3 get authPriv" do
-
     test "get without engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
-      do
+          priv <- [:des, :aes] do
         result =
           auth
           |> get_credential(priv)
@@ -184,8 +175,7 @@ defmodule SNMP.Test do
 
     test "timeout without engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
-      do
+          priv <- [:des, :aes] do
         result =
           auth
           |> get_credential(priv)
@@ -197,8 +187,7 @@ defmodule SNMP.Test do
 
     test "get with engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
-      do
+          priv <- [:des, :aes] do
         result =
           auth
           |> get_credential(priv)
@@ -210,8 +199,7 @@ defmodule SNMP.Test do
 
     test "timeout with engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
-      do
+          priv <- [:des, :aes] do
         result =
           auth
           |> get_credential(priv)
