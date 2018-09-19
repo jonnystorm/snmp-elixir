@@ -8,7 +8,11 @@ defmodule SNMP.Test do
   @moduletag :integrated
 
   @sysname_oid [1, 3, 6, 1, 2, 1, 1, 5, 0]
-  @sysname_value {@sysname_oid, :"OCTET STRING", 'new system name'}
+  @sysname_value {
+    @sysname_oid,
+    :"OCTET STRING",
+    'new system name'
+  }
 
   # Presumably working agent, but has frequent troubles
   @working_agent "demo.snmplabs.com"
@@ -41,7 +45,9 @@ defmodule SNMP.Test do
   end
 
   defp get_credential(auth, priv)
-       when auth in [:md5, :sha] and priv in [:des, :aes] do
+      when auth in [:md5, :sha]
+       and priv in [:des, :aes]
+  do
     SNMP.credential([
       :v3,
       :auth_priv,
@@ -163,7 +169,8 @@ defmodule SNMP.Test do
   describe "v3 get authPriv" do
     test "get without engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes] do
+          priv <- [:des, :aes]
+      do
         result =
           auth
           |> get_credential(priv)
@@ -175,7 +182,8 @@ defmodule SNMP.Test do
 
     test "timeout without engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes] do
+          priv <- [:des, :aes]
+      do
         result =
           auth
           |> get_credential(priv)
@@ -187,7 +195,8 @@ defmodule SNMP.Test do
 
     test "get with engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes] do
+          priv <- [:des, :aes]
+      do
         result =
           auth
           |> get_credential(priv)
@@ -199,7 +208,8 @@ defmodule SNMP.Test do
 
     test "timeout with engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes] do
+          priv <- [:des, :aes]
+      do
         result =
           auth
           |> get_credential(priv)

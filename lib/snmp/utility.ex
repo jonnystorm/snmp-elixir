@@ -15,7 +15,8 @@ defmodule SNMP.Utility do
   #
   #    {bce}
   #
-  defp subtract_minimal_elements_from_poset(poset, adj_map) do
+  defp subtract_minimal_elements_from_poset(poset, adj_map)
+  do
     poset
     |> Enum.flat_map(&Map.get(adj_map, &1, []))
     |> MapSet.new()
@@ -23,12 +24,18 @@ defmodule SNMP.Utility do
 
   defp _topological_sort(poset, adj_map, acc) do
     if MapSet.size(poset) > 0 do
-      next_poset = subtract_minimal_elements_from_poset(poset, adj_map)
+      next_poset =
+        poset
+        |> subtract_minimal_elements_from_poset(adj_map)
 
-      minimal_elements = MapSet.difference(poset, next_poset)
+      minimal_elements =
+        MapSet.difference(poset, next_poset)
 
       if MapSet.size(minimal_elements) == 0 do
-        raise RuntimeError, "detected cycle in subset: #{inspect(MapSet.to_list(poset))}"
+        raise(
+          RuntimeError,
+          "detected cycle in subset: #{inspect(MapSet.to_list(poset))}"
+        )
       end
 
       next_acc = [minimal_elements | acc]
@@ -54,7 +61,10 @@ defmodule SNMP.Utility do
   #
   #    [[b, c, e], [a, d]]
   #
-  @spec topological_sort(%{term => [term]}) :: [[term], ...]
+  @spec topological_sort(%{term => [term]})
+    :: [ [term],
+         ...
+       ]
   def topological_sort(adjacency_map) do
     adjacency_map
     |> Map.keys()
@@ -103,13 +113,14 @@ defmodule SNMP.Utility do
     _find_files_recursive(next_dirs, pattern, next_acc)
   end
 
-  @type path :: String.t()
-  @type pattern :: Regex.t()
-  @type filepath :: String.t()
+  @type path      :: String.t()
+  @type pattern   :: Regex.t()
+  @type filepath  :: String.t()
   @type filepaths :: [filepath, ...] | []
 
   # Analogous to GNU find
-  @spec find_files_recursive(path, pattern) :: filepaths
+  @spec find_files_recursive(path, pattern)
+    :: filepaths
   def find_files_recursive(path, pattern \\ ~r//)
 
   def find_files_recursive(path, pattern) do

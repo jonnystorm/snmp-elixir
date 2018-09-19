@@ -29,7 +29,10 @@ defmodule SNMP.MIB.Test do
         fn {f, _} -> :binary.bin_to_list(f) end
       )
 
-    assert Enum.all?(results, fn {_, {a, _}} -> a == :ok end)
+    assert Enum.all?(results, fn {_, {a, _}} ->
+             a == :ok
+           end)
+
     assert :snmpc.is_consistent(mib_files) == :ok
   end
 
@@ -38,6 +41,8 @@ defmodule SNMP.MIB.Test do
 
     results = compile_all(@tmp_dir)
 
-    assert Enum.all?(results, fn {_, {a, _}} -> a != :ok end)
+    assert Enum.all?(results, fn {_, {a, _}} ->
+             a != :ok
+           end)
   end
 end

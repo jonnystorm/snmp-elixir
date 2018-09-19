@@ -10,10 +10,11 @@ defmodule SNMP.Supervisor do
     # for other strategies and supported options
     children = [
       SNMP,
-      SNMP.DiscoveryAgent
+      SNMP.DiscoveryAgent,
     ]
 
     opts = [strategy: :one_for_one]
+
     Supervisor.init(children, opts)
   end
 end

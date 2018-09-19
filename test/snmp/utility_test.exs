@@ -19,7 +19,10 @@ defmodule SNMP.Utility.Test do
   """ do
     adjacencies = %{:e => [], :b => [:d, :a], :c => [:a]}
 
-    assert topological_sort(adjacencies) == [[:b, :c, :e], [:a, :d]]
+    assert topological_sort(adjacencies) == [
+             [:b, :c, :e],
+             [:a, :d]
+           ]
   end
 
   # Raises on

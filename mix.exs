@@ -58,6 +58,9 @@ defmodule SNMP.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    [{:netaddr_ex, git: "https://github.com/jonnystorm/netaddr-elixir"}]
+    [
+      {:netaddr_ex,
+       git: "https://github.com/jonnystorm/netaddr-elixir"}
+    ]
   end
 end

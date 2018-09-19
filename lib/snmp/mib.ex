@@ -24,12 +24,16 @@ defmodule SNMP.MIB do
   end
 
   defp get_obsolete_mib_rfc_tuple(mib_name) do
-    %{
-      "IPV6-MIB" => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
-      "IPV6-TC" => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
-      "IPV6-ICMP-MIB" => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
-      "IPV6-TCP-MIB" => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
-      "IPV6-UDP-MIB" => {"RFC 8096", "https://tools.ietf.org/html/rfc8096"}
+    %{"IPV6-MIB" =>
+        {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-TC" =>
+        {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-ICMP-MIB" =>
+        {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-TCP-MIB" =>
+        {"RFC 8096", "https://tools.ietf.org/html/rfc8096"},
+      "IPV6-UDP-MIB" =>
+        {"RFC 8096", "https://tools.ietf.org/html/rfc8096"}
     }[String.upcase(mib_name)]
   end
 
@@ -79,43 +83,43 @@ defmodule SNMP.MIB do
   defp get_imports(mib_files) when is_list(mib_files),
     do: _get_imports(mib_files, [])
 
-  @type mib_file :: String.t()
+  @type mib_file      :: String.t()
   @type include_paths :: [String.t()]
 
   @doc """
   Compile the MIB in `mib_file` with includes from
   `include_paths`.
   """
-  @spec compile(mib_file, include_paths) ::
-          {:ok, term}
-          | {:error, term}
+  @spec compile(mib_file, include_paths)
+    :: {:ok, term}
+     | {:error, term}
   def compile(mib_file, include_paths) do
-    outdir = Path.dirname(mib_file)
-    erl_outdir = :binary.bin_to_list(outdir)
+    outdir       = Path.dirname(mib_file)
+    erl_outdir   = :binary.bin_to_list(outdir)
     erl_mib_file = :binary.bin_to_list(mib_file)
-    erl_include_paths = Enum.map(include_paths, &:binary.bin_to_list("#{&1}/"))
 
-    options = [
-      # added this on a lark; mistake?
-      :relaxed_row_name_assign_check,
-      warnings: false,
-      # patched UCD-SNMP-MIB fails without this
-      group_check: false,
-      i: erl_include_paths,
-      outdir: erl_outdir
-    ]
+    erl_include_paths =
+      Enum.map(include_paths,
+        &:binary.bin_to_list("#{&1}/")
+      )
+
+    options =
+      [ # added this on a lark; mistake?
+        :relaxed_row_name_assign_check,
+        warnings: false,
+        # patched UCD-SNMP-MIB fails without this
+        group_check: false,
+        i: erl_include_paths,
+        outdir: erl_outdir,
+      ]
 
     mib_name = Path.basename(mib_file, ".mib")
 
     if is_obsolete_mib(mib_name) do
-      {rfc, link} = get_obsolete_mib_rfc_tuple(mib_name)
+      {rfc, link} =
+        get_obsolete_mib_rfc_tuple(mib_name)
 
-      :ok =
-        Logger.warn(
-          "Compiling obsolete MIB #{inspect(mib_name)}... This may not work. Please see #{rfc} at #{
-            link
-          } for details"
-        )
+      :ok = Logger.warn("Compiling obsolete MIB #{inspect(mib_name)}... This may not work. Please see #{rfc} at #{link} for details")
     end
 
     case :snmpc.compile(erl_mib_file, options) do
@@ -125,10 +129,7 @@ defmodule SNMP.MIB do
         error
 
       {:error, {:invalid_option, option}} = error ->
-        :ok =
-          Logger.debug(
-            "Unable to compile MIB #{inspect(mib_file)} with invalid option #{inspect(option)}"
-          )
+        :ok = Logger.debug("Unable to compile MIB #{inspect(mib_file)} with invalid option #{inspect(option)}")
 
         error
 
@@ -162,7 +163,10 @@ defmodule SNMP.MIB do
   @doc """
   Compile all .mib files in `mib_dirs`.
   """
-  @spec compile_all(mib_dir | [mib_dir, ...]) :: [{mib_file, {:ok, term} | {:error, term}}, ...]
+  @spec compile_all(mib_dir | [mib_dir, ...])
+    :: [ {mib_file, {:ok, term} | {:error, term}},
+         ...
+       ]
   def compile_all(mib_dirs) when is_list(mib_dirs) do
     mib_dirs
     |> list_files_with_mib_extension
