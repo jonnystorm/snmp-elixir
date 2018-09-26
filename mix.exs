@@ -2,12 +2,11 @@ defmodule SNMP.Mixfile do
   use Mix.Project
 
   def project do
-    [
-      app: :snmp_ex,
-      version: "0.1.1",
-      elixir: "~> 1.6",
-      build_embedded: Mix.env() == :prod,
-      start_permanent: Mix.env() == :prod,
+    [ app: :snmp_ex,
+      version: "0.1.2",
+      elixir: "~> 1.7",
+      build_embedded: Mix.env == :prod,
+      start_permanent: Mix.env == :prod,
       deps: deps(),
       dialyzer: [
         plt_add_apps: [
