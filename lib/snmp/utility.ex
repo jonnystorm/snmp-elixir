@@ -62,9 +62,7 @@ defmodule SNMP.Utility do
   #    [[b, c, e], [a, d]]
   #
   @spec topological_sort(%{term => [term]})
-    :: [ [term],
-         ...
-       ]
+    :: [[term], ...]
   def topological_sort(adjacency_map) do
     adjacency_map
     |> Map.keys()

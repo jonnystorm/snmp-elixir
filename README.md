@@ -13,8 +13,10 @@ Many thanks to Dave Martin for his
 without which I may never have bothered returning to this problem.
 
 ## Usage in CLI
+
 ```elixir
-iex> SNMP.Supervisor.start_link
+iex> SNMP.start
+iex>
 iex> v2_cred = SNMP.credential [:v2c, "public"]
 %SNMP.CommunityCredential{
   community: 'public',
@@ -47,37 +49,33 @@ iex> SNMP.walk("ipAddrTable", "an-snmp-host.local", v3_cred) |> Enum.take(1)
 ]
 ```
 
-## Supervisor
-You now can add `SNMP.Supervisor` as a child in your application supervisor tree! The SNMP module is now a GenServer, where it could previously be started by using `SNMP.start` you now should use `SNMP.Supervisor.start_link`
-
 ## Installation
-Add `snmp_ex` to your list of dependencies in you `mix.exs` file. Then run `mix deps.get`;)
+
+Add `:snmp_ex` to `mix.exs`:
+
 ```
+def application do
+  [ extra_applications: [
+      :logger,
+      :snmp_ex,
+    ],
+  ]
+end
+
 defp deps do
-  [
-    {:snmp_ex, git: "https://github.com/jonnystorm/snmp-elixir.git"}
+  [ { :snmp_ex,
+      git: "https://gitlab.com/jonnystorm/snmp-elixir.git"
+    },
   ]
 end
 ```
 
-Add to your `/config/config.exs` file:
+And in `config.exs`:
+
 ```
 config :snmp_ex,
   timeout: 5000,
   max_repetitions: 10
-```
-
-You may also want to add `SNMP` to your supervisor tree in your `application.ex` file (see below for an example):
-```
-def start(_type, _args) do
-  Logger.debug("starting application....")
-
-  children = [
-    SNMP.Supervisor,
-  ]
-
-  Supervisor.start_link(children, strategy: :one_for_one)
-end
 ```
 
 ## Why another wrapper?

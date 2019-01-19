@@ -4,7 +4,7 @@
 # http://mozilla.org/MPL/2.0/.
 
 defmodule SNMP do
-  use GenServer
+  use Application
 
   @moduledoc """
   An SNMP client library for Elixir.
@@ -33,7 +33,7 @@ defmodule SNMP do
 
     @type t ::
       %__MODULE__{
-        version: :v1 | :v2,
+        version:   :v1 | :v2,
         sec_model: :v1 | :v2c,
         community: [byte],
       }
@@ -56,7 +56,7 @@ defmodule SNMP do
         version:   :v3,
         sec_model: :usm,
         sec_level:
-          :noAuthNoPriv
+            :noAuthNoPriv
           | :authNoPriv
           | :authPriv,
         sec_name:  [byte],
@@ -67,10 +67,10 @@ defmodule SNMP do
       }
   end
 
-  def init(state),
-    do: {:ok, state, {:continue, :init}}
+  def start,
+    do: start(:normal, [])
 
-  def handle_continue(:init, state) do
+  def start(_type, args) do
     # snmpm configuration taken from
     # https://github.com/erlang/otp/blob/40de8cc4452dfdc5d390c93860870d4bf4605eb9/lib/snmp/src/manager/snmpm.erl#L156-L196
 
@@ -108,31 +108,51 @@ defmodule SNMP do
       Application.get_env(:snmp_ex, :snmpm_conf_dir)
       |> :binary.bin_to_list()
 
-    :ok =
-      :snmpm.start(
-        versions: [:v1, :v2, :v3],
+    snmpm_opts =
+      [ versions: [:v1, :v2, :v3],
         config: [
           dir:    snmpm_conf_dir,
-          db_dir: snmpm_conf_dir
-        ]
-      )
+          db_dir: snmpm_conf_dir,
+        ],
+      ]
 
-    module = :snmpm_user_default
+    children =
+      [ %{id: :snmpm_supervisor,
+          start: {
+            :snmpm_supervisor,
+            :start_link,
+            [:normal, snmpm_opts]
+          },
+        },
+        %{id: SNMP.DiscoveryAgent,
+          start: {
+            SNMP.DiscoveryAgent,
+            :start_link,
+            []
+          },
+        },
+      ]
+
+    strategy =
+      Keyword.get(args, :strategy, :one_for_one)
+
+    sup_opts =
+      [ name:     SNMP.Supervisor,
+        strategy: strategy,
+      ]
+
+    {:ok, _} = result =
+      Supervisor.start_link(children, sup_opts)
+
+    user_mod = :snmpm_user_default
 
     :ok =
-      :snmpm.register_user(__MODULE__, module, self())
+      :snmpm.register_user(__MODULE__, user_mod, self())
 
     _ = update_mib_cache()
     _ = load_cached_mibs()
 
-    {:noreply, state}
-  end
-
-  def start_link(opts \\ []) do
-    opts1 = [{:name, __MODULE__} | opts]
-
-    {:ok, _pid} =
-      GenServer.start_link(__MODULE__, [], opts1)
+    result
   end
 
   defp find_mibs_recursive(dir),
@@ -298,7 +318,7 @@ defmodule SNMP do
     engine_id
   ) do
     username = credential.sec_name
-    config =
+    config   =
       get_usm_user_config(credential, engine_id)
 
     result =
@@ -323,7 +343,7 @@ defmodule SNMP do
 
   defp register_agent(target, uri, credential, engine_id)
   do
-    netaddr = NetAddr.ip(uri.host)
+    netaddr   = NetAddr.ip(uri.host)
     cred_list = Map.to_list(credential)
     cred_keys =
       [ :version,
@@ -433,7 +453,8 @@ defmodule SNMP do
       )
 
     with {:error, _} <-
-           :snmpm_config.get_agent_engine_id(target_name) do
+           :snmpm_config.get_agent_engine_id(target_name)
+    do
       DiscoveryAgent.discover_engine_id(
         uri,
         timeout: timeout
@@ -442,9 +463,9 @@ defmodule SNMP do
   end
 
   defp warmup_engine_boots_and_engine_time(
-         engine_id,
-         target_name
-       ) do
+    engine_id,
+    target_name
+  ) do
     {:ok, engine_boots} =
       :snmpm_config.get_usm_eboots(engine_id)
 
@@ -462,8 +483,8 @@ defmodule SNMP do
     do: :crypto.hash(:sha, string)
 
   defp is_dotted_decimal(string)
-       when is_binary(string),
-       do: string =~ ~r/^\.?\d(\.\d)+$/
+      when is_binary(string),
+    do: string =~ ~r/^\.?\d(\.\d)+$/
 
   defp is_dotted_decimal(_string),
     do: false
@@ -496,7 +517,8 @@ defmodule SNMP do
     |> Enum.reverse()
   end
 
-  defp normalize_to_uri(%URI{} = uri), do: uri
+  defp normalize_to_uri(%URI{} = uri),
+    do: uri
 
   defp normalize_to_uri(agent) when is_binary(agent) do
     cond do
@@ -509,12 +531,12 @@ defmodule SNMP do
   end
 
   defp _perform_snmp_op(
-         op,
-         oids,
-         target,
-         context,
-         timeout
-       ) do
+    op,
+    oids,
+    target,
+    context,
+    timeout
+  ) do
     case op do
       :get ->
         :snmpm.sync_get(
@@ -537,16 +559,17 @@ defmodule SNMP do
   end
 
   defp perform_snmp_op(
-         op,
-         objects,
-         agent,
-         credential,
-         options
-       ) do
+    op,
+    objects,
+    agent,
+    credential,
+    options
+  ) do
     with {:ok, uri} <-
            agent
            |> normalize_to_uri
-           |> resolve_host_in_uri do
+           |> resolve_host_in_uri
+    do
       oids = normalize_to_oids(objects)
       target = generate_target_name(uri, credential)
 
@@ -567,7 +590,8 @@ defmodule SNMP do
         |> Keyword.get_lazy(:engine_id, discover_fun)
         |> :binary.bin_to_list()
 
-      with :ok <- register_usm_user(credential, engine_id),
+      with :ok <-
+             register_usm_user(credential, engine_id),
            :ok <-
              register_agent(
                target,
@@ -579,7 +603,8 @@ defmodule SNMP do
              warmup_engine_boots_and_engine_time(
                engine_id,
                target
-             ) do
+             )
+      do
         result =
           _perform_snmp_op(
             op,
@@ -606,7 +631,9 @@ defmodule SNMP do
   def get(objects, agent, credential, options \\ [])
 
   def get([h | _] = objects, agent, credential, options)
-      when is_list(h) or is_binary(h) do
+      when is_list(h)
+        or is_binary(h)
+  do
     perform_snmp_op(
       :get,
       objects,
@@ -622,12 +649,13 @@ defmodule SNMP do
   def get_next(objects, agent, credential, options \\ [])
 
   def get_next(
-        [h | _] = objects,
-        agent,
-        credential,
-        options
-      )
-      when is_list(h) or is_binary(h) do
+    [h | _] = objects,
+    agent,
+    credential,
+    options
+  ) when is_list(h)
+      or is_binary(h)
+  do
     perform_snmp_op(
       :get_next,
       objects,
@@ -661,9 +689,9 @@ defmodule SNMP do
 
   @type mib_name :: String.t()
 
-  @spec load_mib(mib_name) ::
-          :ok
-          | {:error, term}
+  @spec load_mib(mib_name)
+    :: :ok
+     | {:error, term}
   def load_mib(mib_name) do
     erl_mib_name = :binary.bin_to_list(mib_name)
 
@@ -678,9 +706,9 @@ defmodule SNMP do
     end
   end
 
-  @spec load_mib!(mib_name) ::
-          :ok
-          | no_return
+  @spec load_mib!(mib_name)
+    :: :ok
+     | no_return
   def load_mib!(mib_name) when is_binary(mib_name) do
     if load_mib(mib_name) == :ok do
       :ok
@@ -691,13 +719,14 @@ defmodule SNMP do
 
   def resolve_object_name_to_oid(oid)
       when is_list(oid),
-      do: oid
+    do: oid
 
   def resolve_object_name_to_oid(name)
-      when is_atom(name) do
+      when is_atom(name)
+  do
     try do
       with {:ok, [oid]} <- :snmpm.name_to_oid(name),
-           do: {:ok, oid}
+        do: {:ok, oid}
     rescue
       e in ArgumentError ->
         :ok = Logger.warn("Unhandled exception: did you forget to `SNMP.start`?")
@@ -820,7 +849,7 @@ defmodule SNMP do
 
   def credential(:v1, community) do
     %CommunityCredential{
-      version: :v1,
+      version:   :v1,
       sec_model: :v1,
       community: :binary.bin_to_list(community)
     }
@@ -828,7 +857,7 @@ defmodule SNMP do
 
   def credential(:v2c, community) do
     %CommunityCredential{
-      version: :v2,
+      version:   :v2,
       sec_model: :v2c,
       community: :binary.bin_to_list(community)
     }
@@ -852,7 +881,7 @@ defmodule SNMP do
   def credential(:v3, :no_auth_no_priv, sec_name),
     do: %USMCredential{
       sec_level: :noAuthNoPriv,
-      sec_name: :binary.bin_to_list(sec_name)
+      sec_name:  :binary.bin_to_list(sec_name)
     }
 
   @doc """
@@ -992,17 +1021,17 @@ defmodule SNMP do
     auth_pass,
     priv_proto,
     priv_pass
-  ) when auth_proto in [:md5, :sha]
-     and priv_proto in [:des, :aes]
+  )   when auth_proto in [:md5, :sha]
+       and priv_proto in [:des, :aes]
   do
     # http://erlang.org/doc/man/snmpm.html#register_usm_user-3
 
     %USMCredential{
       sec_level: :authPriv,
-      sec_name: :binary.bin_to_list(sec_name),
-      auth: auth_proto,
+      sec_name:  :binary.bin_to_list(sec_name),
+      auth:      auth_proto,
       auth_pass: :binary.bin_to_list(auth_pass),
-      priv: priv_proto,
+      priv:      priv_proto,
       priv_pass: :binary.bin_to_list(priv_pass)
     }
   end

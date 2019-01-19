@@ -17,13 +17,8 @@ defmodule SNMP.Test do
   # Presumably working agent, but has frequent troubles
   @working_agent "demo.snmplabs.com"
 
-  # Optimistically, should a broken agent
+  # Optimistically, should be a broken agent
   @borking_agent "localhost:65535"
-
-  setup_all do
-    {:ok, _pid} = SNMP.start_link()
-    :ok
-  end
 
   defp get_credential(:none, :none) do
     SNMP.credential([
