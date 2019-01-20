@@ -11,7 +11,7 @@ defmodule SNMP.Test do
   @sysname_value {
     @sysname_oid,
     :"OCTET STRING",
-    'new system name'
+    'new sys name'
   }
 
   # Presumably working agent, but has frequent troubles
