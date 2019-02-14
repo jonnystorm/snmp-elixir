@@ -4,7 +4,12 @@ use Mix.Config
 
 config :snmp_ex,
   timeout: 5000,
-  max_repetitions: 10
+  max_repetitions: 10,
+  mib_cache: "/tmp/snmp_ex/mibs",
+  snmp_conf_dir: "/tmp/snmp_ex/conf",
+  snmpm_conf_dir: "/tmp/snmp_ex",
+  mib_sources: ["/usr/share/snmp/mibs"],
+  engine_discovery_timeout: 1000
 
 # This configuration is loaded before any dependency and is restricted
 # to this project. If another project depends on this project, this

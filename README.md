@@ -51,13 +51,14 @@ iex> SNMP.walk("ipAddrTable", "an-snmp-host.local", v3_cred) |> Enum.take(1)
 
 ## Installation
 
-Add `:snmp_ex` to `mix.exs`:
+Add `:snmp` to `mix.exs`.
+For linux, make sure that `erlang-snmp` is installed on your machine.
 
 ```
 def application do
   [ extra_applications: [
       :logger,
-      :snmp_ex,
+      :snmp,
     ],
   ]
 end
@@ -77,6 +78,16 @@ config :snmp_ex,
   timeout: 5000,
   max_repetitions: 10
 ```
+
+You can ofcourse also overwrite the default storage directories:
+
+```
+config :snmp_ex,
+  mib_cache: "/data/snmp_ex/mibs",
+  snmp_conf_dir: "/data/snmp_ex/conf",
+  snmpm_conf_dir: "/data/snmp_ex"
+```
+
 
 ## Why another wrapper?
 
