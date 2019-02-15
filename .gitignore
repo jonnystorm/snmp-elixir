@@ -21,5 +21,8 @@ erl_crash.dump
 
 # Ignore hidden and swap files
 .*
+!.gitkeep
 *~
 
+# Ignore snmp state
+/priv/snmp

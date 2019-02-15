@@ -1,7 +1,7 @@
 %{
   "earmark": {:hex, :earmark, "1.2.0", "bf1ce17aea43ab62f6943b97bd6e3dc032ce45d4f787504e3adf738e54b42f3a", [:mix], []},
   "ex_doc": {:git, "https://github.com/elixir-lang/ex_doc", "d294125a87b966ec221500af2a78e48626d81398", []},
-  "jds_math_ex": {:git, "https://gitlab.com/jonnystorm/jds-math-elixir", "e4090226e6d0139adac8ed310310e4e325da7bb5", []},
-  "linear_ex": {:git, "https://gitlab.com/jonnystorm/linear-elixir", "2d9c8794120ce90d7096be7642c17afca0135666", []},
-  "netaddr_ex": {:git, "https://github.com/jonnystorm/netaddr-elixir", "390f60cb73e0277381ec1e2dd86b0ba2b864068a", []},
+  "jds_math_ex": {:git, "https://gitlab.com/jonnystorm/jds-math-elixir.git", "e4090226e6d0139adac8ed310310e4e325da7bb5", []},
+  "linear_ex": {:git, "https://gitlab.com/jonnystorm/linear-elixir.git", "b2bb2546f78e97e4fb6d6b2b3ad00f586864c312", []},
+  "netaddr_ex": {:git, "https://gitlab.com/jonnystorm/netaddr-elixir.git", "0de2e29ed503b3290048f71ef2249b9336e3a112", []},
 }
