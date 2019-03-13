@@ -2,9 +2,8 @@ defmodule SNMP.Mixfile do
   use Mix.Project
 
   def project do
-    [
-      app: :snmp_ex,
-      version: "0.1.2",
+    [ app: :snmp_ex,
+      version: "0.1.3",
       elixir: "~> 1.7",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
@@ -15,53 +14,43 @@ defmodule SNMP.Mixfile do
           :snmp,
           :netaddr_ex,
           :jds_math_ex,
-          :linear_ex
+          :linear_ex,
         ],
         ignore_warnings: "dialyzer.ignore",
         flags: [
           :unmatched_returns,
           :error_handling,
           :race_conditions,
-          :underspecs
-        ]
-      ]
+          :underspecs,
+        ],
+      ],
     ]
   end
 
-  # Configuration for the OTP application
-  #
-  # Type "mix help compile.app" for more information
   def application do
-    # Specify extra applications you'll use from Erlang/Elixir
-    [
-      extra_applications: [
+    [ extra_applications: [
         :logger,
-        :netaddr_ex
-      ]
+        :snmp,
+      ],
+      env: [
+        timeout: 5000,
+        max_repetitions: 10,
+        engine_discovery_timeout: 1000,
+        mib_cache:      "priv/snmp/mibs",
+        snmp_conf_dir:  "priv/snmp/conf",
+        snmpm_conf_dir: "priv/snmp",
+        mib_sources: [
+          "/usr/share/snmp/mibs",
+        ],
+      ],
+      mod: {SNMP, []},
     ]
-    |> Keyword.merge(application(Mix.env()))
   end
 
-  def application(env)
-      when env in [:test, :prod],
-      do: [mod: {SNMP, []}]
-
-  def application(_),
-    do: []
-
-  # Dependencies can be Hex packages:
-  #
-  #   {:my_dep, "~> 0.3.0"}
-  #
-  # Or git/path repositories:
-  #
-  #   {:my_dep, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
-  #
-  # Type "mix help deps" for more examples and options
   defp deps do
-    [
-      {:netaddr_ex,
-       git: "https://github.com/jonnystorm/netaddr-elixir"}
+    [ { :netaddr_ex,
+        git: "https://gitlab.com/jonnystorm/netaddr-elixir.git"
+      },
     ]
   end
 end
