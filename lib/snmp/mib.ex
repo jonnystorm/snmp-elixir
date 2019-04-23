@@ -103,15 +103,19 @@ defmodule SNMP.MIB do
         &:binary.bin_to_list("#{&1}/")
       )
 
-    options =
-      [ # added this on a lark; mistake?
-        :relaxed_row_name_assign_check,
-        warnings: false,
-        # patched UCD-SNMP-MIB fails without this
-        group_check: false,
-        i: erl_include_paths,
-        outdir: erl_outdir,
-      ]
+    options = [
+      :relaxed_row_name_assign_check,
+      warnings: false,
+      verbosity:
+        Application.get_env(
+          :snmp_ex,
+          :snmpc_verbosity,
+          "silence"
+        ),
+      group_check: false,
+      i: erl_include_paths,
+      outdir: erl_outdir
+    ]
 
     mib_name = Path.basename(mib_file, ".mib")
 

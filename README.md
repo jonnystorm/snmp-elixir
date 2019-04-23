@@ -86,8 +86,11 @@ config :snmp_ex,
   mib_cache:      "priv/snmp/mibs",
   snmp_conf_dir:  "priv/snmp/conf",
   snmpm_conf_dir: "priv/snmp",
+  snmpc_verbosity: "silence",
   mib_sources: ["/usr/share/snmp/mibs"]
 ```
+
+`snmpc_verbosity` can be set to different values, see the [erlang docs](http://erlang.org/doc/man/snmpc.html) on which values you can use.
 
 Finally, ensure the `:snmp` OTP application is available in
 your development environment. Some Linux distributions, such
