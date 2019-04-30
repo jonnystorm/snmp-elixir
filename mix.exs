@@ -13,8 +13,6 @@ defmodule SNMP.Mixfile do
           :logger,
           :snmp,
           :netaddr_ex,
-          :jds_math_ex,
-          :linear_ex,
         ],
         ignore_warnings: "dialyzer.ignore",
         flags: [
@@ -48,9 +46,7 @@ defmodule SNMP.Mixfile do
   end
 
   defp deps do
-    [ { :netaddr_ex,
-        git: "https://gitlab.com/jonnystorm/netaddr-elixir.git"
-      },
+    [ {:netaddr_ex, "~> 1.0.5"},
     ]
   end
 end

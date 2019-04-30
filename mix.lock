@@ -3,5 +3,5 @@
   "ex_doc": {:git, "https://github.com/elixir-lang/ex_doc", "d294125a87b966ec221500af2a78e48626d81398", []},
   "jds_math_ex": {:git, "https://gitlab.com/jonnystorm/jds-math-elixir.git", "e4090226e6d0139adac8ed310310e4e325da7bb5", []},
   "linear_ex": {:git, "https://gitlab.com/jonnystorm/linear-elixir.git", "b2bb2546f78e97e4fb6d6b2b3ad00f586864c312", []},
-  "netaddr_ex": {:git, "https://gitlab.com/jonnystorm/netaddr-elixir.git", "0de2e29ed503b3290048f71ef2249b9336e3a112", []},
+  "netaddr_ex": {:hex, :netaddr_ex, "1.0.5", "996dbea308d1e2352b7fa92a2143a2d500546a2de71d8d59d3849b7f794dca0f", [:mix], [], "hexpm"},
 }
