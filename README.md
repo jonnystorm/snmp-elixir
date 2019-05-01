@@ -68,10 +68,7 @@ Add `:snmp_ex` to `mix.exs`:
 
 ```
 defp deps do
-  [ { :snmp_ex,
-      git: "https://gitlab.com/jonnystorm/snmp-elixir.git"
-    },
-  ]
+  [ { :snmp_ex, "~> 0.2.0" } ]
 end
 ```
 
