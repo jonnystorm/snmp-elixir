@@ -18,8 +18,8 @@ problem.
 ```elixir
 iex> SNMP.start
 iex>
-iex> v2_cred = SNMP.credential([:v2c, "public"])
-%SNMP.CommunityCredential{
+iex> v2_cred = SNMP.Credential.login([:v2c, "public"])
+%SNMP.Credential.Community{
   community: 'public',
   sec_model: :v2c,
   version: :v2
@@ -35,7 +35,7 @@ iex> SNMP.get(base_oid ++ [0], "an-snmp-host.local", v2_cred)
 ]
 iex>
 iex> v3_cred =
-...>   SNMP.credential(
+...>   SNMP.Credential.login(
 ...>     [ :v3,
 ...>       :auth_priv,
 ...>       "user",
@@ -45,7 +45,7 @@ iex> v3_cred =
 ...>       "privpass",
 ...>     ]
 ...>  )
-%SNMP.USMCredential{
+%SNMP.Credential.USM{
   auth: :sha,
   auth_pass: 'authpass',
   priv: :aes,

@@ -15,13 +15,13 @@ defmodule SNMP.Test do
   }
 
   # Presumably working agent, but has frequent troubles
-  @working_agent "demo.snmplabs.com"
+  @working_agent URI.parse("http://demo.snmplabs.com:161")
 
   # Optimistically, should be a broken agent
-  @borking_agent "localhost:65535"
+  @broken_agent "localhost:65535"
 
   defp get_credential(:none, :none) do
-    SNMP.credential([
+    SNMP.Credential.login([
       :v3,
       :no_auth_no_priv,
       "usr-none-none"
@@ -30,7 +30,7 @@ defmodule SNMP.Test do
 
   defp get_credential(auth, :none)
        when auth in [:md5, :sha] do
-    SNMP.credential([
+    SNMP.Credential.login([
       :v3,
       :auth_no_priv,
       "usr-#{Atom.to_string(auth)}-none",
@@ -40,10 +40,9 @@ defmodule SNMP.Test do
   end
 
   defp get_credential(auth, priv)
-      when auth in [:md5, :sha]
-       and priv in [:des, :aes]
-  do
-    SNMP.credential([
+       when auth in [:md5, :sha] and
+              priv in [:des, :aes] do
+    SNMP.Credential.login([
       :v3,
       :auth_priv,
       "usr-#{Atom.to_string(auth)}-#{Atom.to_string(priv)}",
@@ -91,7 +90,7 @@ defmodule SNMP.Test do
       result =
         :none
         |> get_credential(:none)
-        |> get_sysname_with_engine_id(@borking_agent)
+        |> get_sysname_with_engine_id(@broken_agent)
 
       assert result == {:error, :etimedout}
     end
@@ -109,7 +108,7 @@ defmodule SNMP.Test do
       result =
         :none
         |> get_credential(:none)
-        |> get_sysname(@borking_agent)
+        |> get_sysname(@broken_agent)
 
       assert result == {:error, :etimedout}
     end
@@ -132,7 +131,7 @@ defmodule SNMP.Test do
         result =
           auth
           |> get_credential(:none)
-          |> get_sysname_with_engine_id(@borking_agent)
+          |> get_sysname_with_engine_id(@broken_agent)
 
         assert result == {:error, :etimedout}
       end
@@ -154,7 +153,7 @@ defmodule SNMP.Test do
         result =
           auth
           |> get_credential(:none)
-          |> get_sysname(@borking_agent)
+          |> get_sysname(@broken_agent)
 
         assert result == {:error, :etimedout}
       end
@@ -164,8 +163,7 @@ defmodule SNMP.Test do
   describe "v3 get authPriv" do
     test "get without engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
-      do
+          priv <- [:des, :aes] do
         result =
           auth
           |> get_credential(priv)
@@ -177,12 +175,11 @@ defmodule SNMP.Test do
 
     test "timeout without engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
-      do
+          priv <- [:des, :aes] do
         result =
           auth
           |> get_credential(priv)
-          |> get_sysname_with_engine_id(@borking_agent)
+          |> get_sysname_with_engine_id(@broken_agent)
 
         assert result == {:error, :etimedout}
       end
@@ -190,8 +187,7 @@ defmodule SNMP.Test do
 
     test "get with engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
-      do
+          priv <- [:des, :aes] do
         result =
           auth
           |> get_credential(priv)
@@ -203,15 +199,26 @@ defmodule SNMP.Test do
 
     test "timeout with engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
-      do
+          priv <- [:des, :aes] do
         result =
           auth
           |> get_credential(priv)
-          |> get_sysname(@borking_agent)
+          |> get_sysname(@broken_agent)
 
         assert result == {:error, :etimedout}
       end
+    end
+  end
+
+  describe "testing v1 against SNMPD running in docker" do
+    test "get" do
+      cred = SNMP.Credential.login(:v1, "public")
+      oid = [1, 3, 6, 1, 2, 1, 1, 5, 0]
+
+      [{^oid, _type, return}] =
+        SNMP.get(oid, @working_agent, cred)
+
+      assert return == '41ebe8b84b5d'
     end
   end
 end
