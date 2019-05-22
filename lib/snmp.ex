@@ -25,8 +25,7 @@ defmodule SNMP do
     # snmpm configuration taken from
     # https://github.com/erlang/otp/blob/40de8cc4452dfdc5d390c93860870d4bf4605eb9/lib/snmp/src/manager/snmpm.erl#L156-L196
 
-    mib_cache =
-      Application.get_env(:snmp_ex, :mib_cache)
+    mib_cache = Application.get_env(:snmp_ex, :mib_cache)
 
     snmp_conf_dir =
       Application.get_env(:snmp_ex, :snmp_conf_dir)
@@ -59,41 +58,39 @@ defmodule SNMP do
       Application.get_env(:snmp_ex, :snmpm_conf_dir)
       |> :binary.bin_to_list()
 
-    snmpm_opts =
-      [ versions: [:v1, :v2, :v3],
-        config: [
-          dir:    snmpm_conf_dir,
-          db_dir: snmpm_conf_dir,
-        ],
+    snmpm_opts = [
+      versions: [:v1, :v2, :v3],
+      config: [
+        dir: snmpm_conf_dir,
+        db_dir: snmpm_conf_dir
       ]
+    ]
 
-    children =
-      [ %{id: :snmpm_supervisor,
-          start: {
-            :snmpm_supervisor,
-            :start_link,
-            [:normal, snmpm_opts]
-          },
-        },
-        %{id: SNMP.DiscoveryAgent,
-          start: {
-            SNMP.DiscoveryAgent,
-            :start_link,
-            []
-          },
-        },
-      ]
+    children = [
+      %{
+        id: :snmpm_supervisor,
+        start: {
+          :snmpm_supervisor,
+          :start_link,
+          [:normal, snmpm_opts]
+        }
+      },
+      %{
+        id: SNMP.DiscoveryAgent,
+        start: {
+          SNMP.DiscoveryAgent,
+          :start_link,
+          []
+        }
+      }
+    ]
 
-    strategy =
-      Keyword.get(args, :strategy, :one_for_one)
+    strategy = Keyword.get(args, :strategy, :one_for_one)
 
-    sup_opts =
-      [ name:     SNMP.Supervisor,
-        strategy: strategy,
-      ]
+    sup_opts = [name: SNMP.Supervisor, strategy: strategy]
 
-    {:ok, _} = result =
-      Supervisor.start_link(children, sup_opts)
+    {:ok, _} =
+      result = Supervisor.start_link(children, sup_opts)
 
     user_mod = :snmpm_user_default
 
@@ -104,6 +101,108 @@ defmodule SNMP do
     _ = load_cached_mibs()
 
     result
+  end
+
+  def get(
+        [h | _] = object,
+        agent,
+        credential,
+        options \\ []
+      )
+      when is_integer(h) do
+    perform_snmp_op(
+      :get,
+      object,
+      agent,
+      credential,
+      options
+    )
+  end
+
+  def get_next(
+        [h | _] = object,
+        agent,
+        credential,
+        options \\ []
+      )
+      when is_integer(h) do
+    perform_snmp_op(
+      :get_next,
+      object,
+      agent,
+      credential,
+      options
+    )
+  end
+
+  def walk(object, agent, credential, options \\ []) do
+    [base_oid] = normalize_to_oid(object)
+
+    {base_oid ++ [0], nil, nil}
+    |> Stream.iterate(fn last_result ->
+      {last_oid, _, _} = last_result
+
+      last_oid
+      |> get_next(agent, credential, options)
+      |> List.first()
+    end)
+    |> Stream.take_while(fn {oid, _, _} ->
+      List.starts_with?(oid, base_oid)
+    end)
+    |> Stream.drop(1)
+  end
+  @type mib_name :: String.t()
+  @spec load_mib(mib_name) ::
+          :ok
+          | {:error, term}
+  def load_mib(mib_name) do
+    erl_mib_name = :binary.bin_to_list(mib_name)
+
+    case :snmpm.load_mib(erl_mib_name) do
+      :ok ->
+        :ok
+
+      {:error, reason} = error ->
+        :ok =
+          Logger.error(
+            "Unable to load MIB #{inspect(mib_name)}: #{
+              reason
+            }"
+          )
+
+        error
+    end
+  end
+
+  @spec load_mib!(mib_name) ::
+          :ok
+          | no_return
+  def load_mib!(mib_name) when is_binary(mib_name) do
+    if load_mib(mib_name) == :ok do
+      :ok
+    else
+      raise "Unable to load mib #{inspect(mib_name)}"
+    end
+  end
+
+  def resolve_object_name_to_oid(oid)
+      when is_list(oid),
+      do: oid
+
+  def resolve_object_name_to_oid(name)
+      when is_atom(name) do
+    try do
+      with {:ok, [oid]} <- :snmpm.name_to_oid(name),
+           do: {:ok, oid}
+    rescue
+      e in ArgumentError ->
+        :ok =
+          Logger.warn(
+            "Unhandled exception: did you forget to `SNMP.start`?"
+          )
+
+        reraise(e, System.stacktrace())
+    end
   end
 
   defp find_mibs_recursive(dir),
@@ -163,25 +262,21 @@ defmodule SNMP do
     |> Enum.map(&load_mib/1)
   end
 
-  defp get_timeout,
-    do: Application.get_env(:snmp_ex, :timeout)
+  defp timeout,
+    do: Application.get_env(:snmp_ex, :timeout, 1000)
 
-  defp get_max_repetitions,
-    do: Application.get_env(:snmp_ex, :max_repetitions)
+  defp delimiter_by_family(4), do: "."
+  defp delimiter_by_family(6), do: ":"
 
-  defp get_delimiter_by_family(4), do: "."
-  defp get_delimiter_by_family(6), do: ":"
-
-  defp get_host_by_name(hostname) do
+  defp host_by_name(hostname) do
     result =
       hostname
       |> :binary.bin_to_list()
       |> :inet.gethostbyname()
 
-    with {:ok, {_, _, _, _, family, [address | _]}}
-           <- result
-    do
-      delimiter = get_delimiter_by_family(family)
+    with {:ok, {_, _, _, _, family, [address | _]}} <-
+           result do
+      delimiter = delimiter_by_family(family)
 
       address_string =
         address
@@ -204,33 +299,29 @@ defmodule SNMP do
 
   defp resolve_host_to_netaddr(host) do
     with {:error, _} <- parse_ip(host),
-         {:ok, ip} <- get_host_by_name(host),
-      do: parse_ip(ip)
+         {:ok, ip} <- host_by_name(host),
+         do: parse_ip(ip)
   end
 
   defp resolve_host_in_uri(uri) do
-    with {:ok, netaddr}
-           <- resolve_host_to_netaddr(uri.host)
-    do
-      ip_uri =
-        %{uri |
-          host: "#{NetAddr.address(netaddr)}"
-        }
+    with {:ok, netaddr} <-
+           resolve_host_to_netaddr(uri.host) do
+      ip_uri = %{uri | host: "#{NetAddr.address(netaddr)}"}
 
       {:ok, ip_uri}
     end
   end
 
-  defp get_transport_from_netaddr(%NetAddr.IPv4{}),
+  defp transport_from_netaddr(%NetAddr.IPv4{}),
     do: :transportDomainUdpIpv4
 
-  defp get_transport_from_netaddr(%NetAddr.IPv6{}),
+  defp transport_from_netaddr(%NetAddr.IPv6{}),
     do: :transportDomainUdpIpv6
 
-  defp get_usm_user_config(credential, engine_id) do
-    auth      = credential.auth
+  defp usm_user_config(credential, engine_id) do
+    auth = credential.auth
     auth_pass = credential.auth_pass
-    priv      = credential.priv
+    priv = credential.priv
     priv_pass = credential.priv_pass
 
     auth_key =
@@ -256,21 +347,21 @@ defmodule SNMP do
         |> Enum.slice(0..15)
       end
 
-    [ sec_name: credential.sec_name,
-      auth:     auth_proto_to_snmpm_auth(auth),
+    [
+      sec_name: credential.sec_name,
+      auth: auth_proto_to_snmpm_auth(auth),
       auth_key: auth_key,
-      priv:     priv_proto_to_snmpm_auth(priv),
+      priv: priv_proto_to_snmpm_auth(priv),
       priv_key: priv_key
     ]
   end
 
   defp register_usm_user(
-    %{sec_model: :usm} = credential,
-    engine_id
-  ) do
+         %{sec_model: :usm} = credential,
+         engine_id
+       ) do
     username = credential.sec_name
-    config   =
-      get_usm_user_config(credential, engine_id)
+    config = usm_user_config(credential, engine_id)
 
     result =
       :snmpm.register_usm_user(engine_id, username, config)
@@ -283,7 +374,12 @@ defmodule SNMP do
         :ok
 
       {:error, reason} = error ->
-        :ok = Logger.error("Unable to register USM user '#{username}': #{inspect(reason)}")
+        :ok =
+          Logger.error(
+            "Unable to register USM user '#{username}': #{
+              inspect(reason)
+            }"
+          )
 
         error
     end
@@ -292,26 +388,32 @@ defmodule SNMP do
   defp register_usm_user(_credential, _engine_id),
     do: :ok
 
-  defp register_agent(target, uri, credential, engine_id)
-  do
-    netaddr   = NetAddr.ip(uri.host)
+  defp register_agent(target, uri, credential, engine_id) do
+    netaddr = NetAddr.ip(uri.host)
     cred_list = Map.to_list(credential)
-    cred_keys =
-      [ :version,
-        :sec_model,
-        :community,
-        :sec_level,
-        :sec_name
-      ]
+
+    cred_keys = [
+      :version,
+      :sec_model,
+      :community,
+      :sec_level,
+      :sec_name
+    ]
 
     config =
-      [ engine_id: engine_id,
-        address:   NetAddr.netaddr_to_list(netaddr),
-        port:      uri.port || 161,
-        tdomain:   get_transport_from_netaddr(netaddr)
+      [
+        engine_id: engine_id,
+        address: NetAddr.netaddr_to_list(netaddr),
+        port: uri.port || 161,
+        tdomain: transport_from_netaddr(netaddr)
       ] ++ Keyword.take(cred_list, cred_keys)
 
-    :ok = Logger.debug("Will register agent #{uri} with target #{inspect(target)} and config #{inspect(config)}.")
+    :ok =
+      Logger.debug(
+        "Will register agent #{uri} with target #{
+          inspect(target)
+        } and config #{inspect(config)}."
+      )
 
     result =
       :snmpm.register_agent(__MODULE__, target, config)
@@ -327,7 +429,12 @@ defmodule SNMP do
         :ok
 
       {:error, reason} = error ->
-        :ok = Logger.error("Unable to register agent for #{uri}: #{inspect(reason)}")
+        :ok =
+          Logger.error(
+            "Unable to register agent for #{uri}: #{
+              inspect(reason)
+            }"
+          )
 
         error
     end
@@ -335,20 +442,30 @@ defmodule SNMP do
 
   defp usm_stat_oid_to_name(oid) do
     case oid do
-      [1,3,6,1,6,3,15,1,1,1,0] -> :usmStatsUnsupportedSecLevels
-      [1,3,6,1,6,3,15,1,1,2,0] -> :usmStatsNotInTimeWindows
-      [1,3,6,1,6,3,15,1,1,3,0] -> :usmStatsUnknownUserNames
-      [1,3,6,1,6,3,15,1,1,4,0] -> :usmStatsUnknownEngineIDs
-      [1,3,6,1,6,3,15,1,1,5,0] -> :usmStatsWrongDigests
-      [1,3,6,1,6,3,15,1,1,6,0] -> :usmStatsDecryptionErrors
+      [1, 3, 6, 1, 6, 3, 15, 1, 1, 1, 0] ->
+        :usmStatsUnsupportedSecLevels
+
+      [1, 3, 6, 1, 6, 3, 15, 1, 1, 2, 0] ->
+        :usmStatsNotInTimeWindows
+
+      [1, 3, 6, 1, 6, 3, 15, 1, 1, 3, 0] ->
+        :usmStatsUnknownUserNames
+
+      [1, 3, 6, 1, 6, 3, 15, 1, 1, 4, 0] ->
+        :usmStatsUnknownEngineIDs
+
+      [1, 3, 6, 1, 6, 3, 15, 1, 1, 5, 0] ->
+        :usmStatsWrongDigests
+
+      [1, 3, 6, 1, 6, 3, 15, 1, 1, 6, 0] ->
+        :usmStatsDecryptionErrors
     end
   end
 
   defp groom_snmp_result(result) do
-    sort_fun =
-      fn {_, _, _, _, original_index} ->
-        original_index
-      end
+    sort_fun = fn {_, _, _, _, original_index} ->
+      original_index
+    end
 
     case result do
       {:ok, {:noError, 0, varbinds}, _} ->
@@ -366,12 +483,16 @@ defmodule SNMP do
       {:error, {:invalid_oid, {:ok, oid}}} ->
         oid_string = Enum.join(oid, ".")
 
-        :ok = Logger.error("Invalid OID #{inspect(oid_string)}")
+        :ok =
+          Logger.error(
+            "Invalid OID #{inspect(oid_string)}"
+          )
 
         {:error, {:invalid_oid, oid}}
 
       {:error, {:send_failed, _, reason}} ->
-        :ok = Logger.error("Send failed: #{inspect(reason)}")
+        :ok =
+          Logger.error("Send failed: #{inspect(reason)}")
 
         {:error, reason}
 
@@ -380,7 +501,10 @@ defmodule SNMP do
 
         name = usm_stat_oid_to_name(oid)
 
-        :ok = Logger.error("Received USM stats response: #{name}")
+        :ok =
+          Logger.error(
+            "Received USM stats response: #{name}"
+          )
 
         {:error, name}
 
@@ -390,7 +514,10 @@ defmodule SNMP do
         {:error, :etimedout}
 
       other ->
-        :ok = Logger.error("Unexpected result: #{inspect(other)}")
+        :ok =
+          Logger.error(
+            "Unexpected result: #{inspect(other)}"
+          )
 
         {:error, :unknown_error}
     end
@@ -404,8 +531,7 @@ defmodule SNMP do
       )
 
     with {:error, _} <-
-           :snmpm_config.get_agent_engine_id(target_name)
-    do
+           :snmpm_config.get_agent_engine_id(target_name) do
       DiscoveryAgent.discover_engine_id(
         uri,
         timeout: timeout
@@ -414,9 +540,9 @@ defmodule SNMP do
   end
 
   defp warmup_engine_boots_and_engine_time(
-    engine_id,
-    target_name
-  ) do
+         engine_id,
+         target_name
+       ) do
     {:ok, engine_boots} =
       :snmpm_config.get_usm_eboots(engine_id)
 
@@ -434,8 +560,8 @@ defmodule SNMP do
     do: :crypto.hash(:sha, string)
 
   defp is_dotted_decimal(string)
-      when is_binary(string),
-    do: string =~ ~r/^\.?\d(\.\d)+$/
+       when is_binary(string),
+       do: string =~ ~r/^\.?\d(\.\d)+$/
 
   defp is_dotted_decimal(_string),
     do: false
@@ -481,47 +607,63 @@ defmodule SNMP do
     end
   end
 
-  defp _perform_snmp_op(
-    op,
-    oids,
-    target,
-    context,
-    timeout
-  ) do
-    case op do
-      :get ->
-        :snmpm.sync_get(
-          __MODULE__,
-          target,
-          context,
-          oids,
-          timeout
-        )
 
-      :get_next ->
-        :snmpm.sync_get_next(
           __MODULE__,
           target,
-          context,
-          oids,
-          timeout
         )
     end
   end
 
   defp perform_snmp_op(
-    op,
-    objects,
-    agent,
-    credential,
-    options
-  ) do
+         op,
+         object,
+         agent,
+         credential,
+         options
+       ) do
+    [oid, target, erl_context] =
+      prepare_perform_snmp_op(
+        object,
+        agent,
+        credential,
+        options
+      )
+
+    result =
+      case op do
+        :get ->
+          :snmpm.sync_get(
+            __MODULE__,
+            target,
+            erl_context,
+            oid,
+            timeout()
+          )
+
+        :get_next ->
+          :snmpm.sync_get_next(
+            __MODULE__,
+            target,
+            erl_context,
+            oid,
+            timeout()
+          )
+      end
+
+    groom_snmp_result(result)
+  end
+
+  defp prepare_perform_snmp_op(
+         object,
+         agent,
+         credential,
+         options
+       ) do
     with {:ok, uri} <-
            agent
            |> normalize_to_uri
-           |> resolve_host_in_uri
-    do
-      oids = normalize_to_oids(objects)
+           |> resolve_host_in_uri do
+      oid = normalize_to_oid(object)
       target = generate_target_name(uri, credential)
 
       erl_context =
@@ -541,32 +683,23 @@ defmodule SNMP do
         |> Keyword.get_lazy(:engine_id, discover_fun)
         |> :binary.bin_to_list()
 
-      with :ok <-
-             register_usm_user(credential, engine_id),
-           :ok <-
-             register_agent(
-               target,
-               uri,
-               credential,
-               engine_id
-             ),
-           :ok <-
-             warmup_engine_boots_and_engine_time(
-               engine_id,
-               target
-             )
-      do
-        result =
-          _perform_snmp_op(
-            op,
-            oids,
-            target,
-            erl_context,
-            get_timeout()
-          )
+      :ok = register_usm_user(credential, engine_id)
 
-        groom_snmp_result(result)
-      end
+      :ok =
+        register_agent(
+          target,
+          uri,
+          credential,
+          engine_id
+        )
+
+      :ok =
+        warmup_engine_boots_and_engine_time(
+          engine_id,
+          target
+        )
+
+      [oid, target, erl_context]
     end
   end
 
@@ -579,123 +712,21 @@ defmodule SNMP do
     |> :binary.bin_to_list()
   end
 
-  def get(objects, agent, credential, options \\ [])
+  defp auth_proto_to_snmpm_auth(:md5),
+    do: :usmHMACMD5AuthProtocol
 
-  def get([h | _] = objects, agent, credential, options)
-      when is_list(h)
-        or is_binary(h)
-  do
-    perform_snmp_op(
-      :get,
-      objects,
-      agent,
-      credential,
-      options
-    )
-  end
+  defp auth_proto_to_snmpm_auth(:sha),
+    do: :usmHMACSHAAuthProtocol
 
-  def get(object, agent, credential, options),
-    do: get([object], agent, credential, options)
+  defp auth_proto_to_snmpm_auth(_), do: :usmNoAuthProtocol
 
-  def get_next(objects, agent, credential, options \\ [])
+  defp priv_proto_to_snmpm_auth(:des),
+    do: :usmDESPrivProtocol
 
-  def get_next(
-    [h | _] = objects,
-    agent,
-    credential,
-    options
-  ) when is_list(h)
-      or is_binary(h)
-  do
-    perform_snmp_op(
-      :get_next,
-      objects,
-      agent,
-      credential,
-      options
-    )
-  end
+  defp priv_proto_to_snmpm_auth(:aes),
+    do: :usmAesCfb128Protocol
 
-  def get_next(object, agent, credential, options),
-    do: get_next([object], agent, credential, options)
-
-  def walk(object, agent, credential, options \\ [])
-
-  def walk(object, agent, credential, options) do
-    [base_oid] = normalize_to_oids([object])
-
-    {base_oid ++ [0], nil, nil}
-    |> Stream.iterate(fn last_result ->
-      {last_oid, _, _} = last_result
-
-      last_oid
-      |> get_next(agent, credential, options)
-      |> List.first()
-    end)
-    |> Stream.take_while(fn {oid, _, _} ->
-      List.starts_with?(oid, base_oid)
-    end)
-    |> Stream.drop(1)
-  end
-
-  @type mib_name :: String.t()
-
-  @spec load_mib(mib_name)
-    :: :ok
-     | {:error, term}
-  def load_mib(mib_name) do
-    erl_mib_name = :binary.bin_to_list(mib_name)
-
-    case :snmpm.load_mib(erl_mib_name) do
-      :ok ->
-        :ok
-
-      {:error, reason} = error ->
-        :ok = Logger.error("Unable to load MIB #{inspect(mib_name)}: #{reason}")
-
-        error
-    end
-  end
-
-  @spec load_mib!(mib_name)
-    :: :ok
-     | no_return
-  def load_mib!(mib_name) when is_binary(mib_name) do
-    if load_mib(mib_name) == :ok do
-      :ok
-    else
-      raise "Unable to load mib #{inspect(mib_name)}"
-    end
-  end
-
-  def resolve_object_name_to_oid(oid)
-      when is_list(oid),
-    do: oid
-
-  def resolve_object_name_to_oid(name)
-      when is_atom(name)
-  do
-    try do
-      with {:ok, [oid]} <- :snmpm.name_to_oid(name),
-        do: {:ok, oid}
-    rescue
-      e in ArgumentError ->
-        :ok = Logger.warn("Unhandled exception: did you forget to `SNMP.start`?")
-
-        reraise(e, System.stacktrace())
-    end
-  end
-
-
-
-  defp auth_proto_to_snmpm_auth(:md5), do: :usmHMACMD5AuthProtocol
-  defp auth_proto_to_snmpm_auth(:sha), do: :usmHMACSHAAuthProtocol
-  defp auth_proto_to_snmpm_auth(_),    do: :usmNoAuthProtocol
-  defp priv_proto_to_snmpm_auth(:des), do: :usmDESPrivProtocol
-  defp priv_proto_to_snmpm_auth(:aes), do: :usmAesCfb128Protocol
-  defp priv_proto_to_snmpm_auth(_),    do: :usmNoPrivProtocol
-
-
+  defp priv_proto_to_snmpm_auth(_), do: :usmNoPrivProtocol
 
   @doc """
   Converts `oid` to dot-delimited string.
@@ -706,9 +737,9 @@ defmodule SNMP do
       "1.3.6.1.2.1.1.5.0"
 
   """
-  @spec list_oid_to_string([non_neg_integer])
-    :: String.t()
-     | no_return
+  @spec list_oid_to_string([non_neg_integer]) ::
+          String.t()
+          | no_return
   def list_oid_to_string(oid) when is_list(oid),
     do: Enum.join(oid, ".")
 
@@ -721,9 +752,9 @@ defmodule SNMP do
       [1,3,6,1,2,1,1,5,0]
 
   """
-  @spec string_oid_to_list(String.t())
-    :: [non_neg_integer]
-     | no_return
+  @spec string_oid_to_list(String.t()) ::
+          [non_neg_integer]
+          | no_return
   def string_oid_to_list(oid) when is_binary(oid) do
     oid
     |> String.split(".", trim: true)

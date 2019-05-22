@@ -2,7 +2,8 @@ defmodule SNMP.Mixfile do
   use Mix.Project
 
   def project do
-    [ app: :snmp_ex,
+    [
+      app: :snmp_ex,
       version: "0.2.0",
       elixir: "~> 1.7",
       build_embedded: Mix.env() == :prod,
@@ -14,43 +15,45 @@ defmodule SNMP.Mixfile do
         plt_add_apps: [
           :logger,
           :snmp,
-          :netaddr_ex,
+          :netaddr_ex
         ],
         ignore_warnings: "dialyzer.ignore",
         flags: [
           :unmatched_returns,
           :error_handling,
           :race_conditions,
-          :underspecs,
-        ],
-      ],
+          :underspecs
+        ]
+      ]
     ]
   end
 
   def application do
-    [ extra_applications: [
+    [
+      extra_applications: [
         :logger,
-        :snmp,
+        :snmp
       ],
       env: [
         timeout: 5000,
-        max_repetitions: 10,
         engine_discovery_timeout: 1000,
-        mib_cache:      "priv/snmp/mibs",
-        snmp_conf_dir:  "priv/snmp/conf",
+        mib_cache: "priv/snmp/mibs",
+        snmp_conf_dir: "priv/snmp/conf",
         snmpm_conf_dir: "priv/snmp",
         mib_sources: [
-          "/usr/share/snmp/mibs",
-        ],
+          "/usr/share/snmp/mibs"
+        ]
       ],
-      mod: {SNMP, []},
+      mod: {SNMP, []}
+    ]
+  end
     ]
   end
 
   defp deps do
     [
       {:ex_doc, "~> 0.19", only: :dev, runtime: false},
-      {:netaddr_ex, "~> 1.0.5"},
+      {:netaddr_ex, "~> 1.0.5"}
     ]
   end
 
@@ -58,13 +61,13 @@ defmodule SNMP.Mixfile do
     "An SNMP client library for Elixir, wrapping the Erlang OTP SNMP API and Logic"
   end
 
-    defp package do
-    [ licenses: ["Mozilla Public License 2.0"],
+  defp package do
+    [
+      licenses: ["Mozilla Public License 2.0"],
       links: %{
-        "GitHub" => "https://github.com/jonnystorm/snmp-elixir",
-      },
+        "GitHub" =>
+          "https://github.com/jonnystorm/snmp-elixir"
+      }
     ]
   end
-
-
 end
