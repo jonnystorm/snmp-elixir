@@ -103,6 +103,11 @@ Google results for "elixir snmp" but it is, which scares me.
 Elixir may be the best language for network interaction in
 existence, but we still need worthy SNMP support.
 
+## Testing
+
+We are using a couple of docker containers running SNMPSim, each one of these containers are setup to accept a single type of authentication and encryption. When running `mix test`, a customer docker-compose task is also run in front of it. This will ensure that all the docker containers are started and available for testing against.
+
+
 ## Contributing
 
 This project will accept (merge/rebase/squash) *all*

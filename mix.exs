@@ -9,6 +9,7 @@ defmodule SNMP.Mixfile do
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      aliases: aliases(),
       description: description(),
       package: package(),
       dialyzer: [
@@ -47,6 +48,10 @@ defmodule SNMP.Mixfile do
       mod: {SNMP, []}
     ]
   end
+
+  defp aliases do
+    [
+      test: ["docker_compose", "test"]
     ]
   end
 

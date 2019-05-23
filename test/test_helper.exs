@@ -1,3 +1,3 @@
 ExUnit.start()
 
-ExUnit.configure(exclude: [:expensive, :integrated])
+ExUnit.configure(exclude: [:integrated, :skip])

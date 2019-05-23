@@ -104,12 +104,11 @@ defmodule SNMP do
   end
 
   def get(
-        [h | _] = object,
+        object,
         agent,
         credential,
         options \\ []
-      )
-      when is_integer(h) do
+      ) do
     perform_snmp_op(
       :get,
       object,
@@ -120,12 +119,11 @@ defmodule SNMP do
   end
 
   def get_next(
-        [h | _] = object,
+        object,
         agent,
         credential,
         options \\ []
-      )
-      when is_integer(h) do
+      ) do
     perform_snmp_op(
       :get_next,
       object,
@@ -151,6 +149,26 @@ defmodule SNMP do
     end)
     |> Stream.drop(1)
   end
+
+  def set(
+        object,
+        agent,
+        credential,
+        value,
+        value_type,
+        options \\ []
+      ) do
+    perform_snmp_op(
+      :set,
+      object,
+      agent,
+      credential,
+      value,
+      value_type,
+      options
+    )
+  end
+
   @type mib_name :: String.t()
   @spec load_mib(mib_name) ::
           :ok
@@ -163,12 +181,11 @@ defmodule SNMP do
         :ok
 
       {:error, reason} = error ->
-        :ok =
-          Logger.error(
-            "Unable to load MIB #{inspect(mib_name)}: #{
-              reason
-            }"
-          )
+        Logger.error(
+          "Unable to load MIB #{inspect(mib_name)}: #{
+            reason
+          }"
+        )
 
         error
     end
@@ -196,10 +213,9 @@ defmodule SNMP do
            do: {:ok, oid}
     rescue
       e in ArgumentError ->
-        :ok =
-          Logger.warn(
-            "Unhandled exception: did you forget to `SNMP.start`?"
-          )
+        Logger.warn(
+          "Unhandled exception: did you forget to `SNMP.start`?"
+        )
 
         reraise(e, System.stacktrace())
     end
@@ -263,7 +279,7 @@ defmodule SNMP do
   end
 
   defp timeout,
-    do: Application.get_env(:snmp_ex, :timeout, 1000)
+    do: Application.get_env(:snmp_ex, :timeout, 5000)
 
   defp delimiter_by_family(4), do: "."
   defp delimiter_by_family(6), do: ":"
@@ -374,12 +390,11 @@ defmodule SNMP do
         :ok
 
       {:error, reason} = error ->
-        :ok =
-          Logger.error(
-            "Unable to register USM user '#{username}': #{
-              inspect(reason)
-            }"
-          )
+        Logger.error(
+          "Unable to register USM user '#{username}': #{
+            inspect(reason)
+          }"
+        )
 
         error
     end
@@ -408,12 +423,11 @@ defmodule SNMP do
         tdomain: transport_from_netaddr(netaddr)
       ] ++ Keyword.take(cred_list, cred_keys)
 
-    :ok =
-      Logger.debug(
-        "Will register agent #{uri} with target #{
-          inspect(target)
-        } and config #{inspect(config)}."
-      )
+    Logger.debug(
+      "Will register agent #{uri} with target #{
+        inspect(target)
+      } and config #{inspect(config)}."
+    )
 
     result =
       :snmpm.register_agent(__MODULE__, target, config)
@@ -429,12 +443,11 @@ defmodule SNMP do
         :ok
 
       {:error, reason} = error ->
-        :ok =
-          Logger.error(
-            "Unable to register agent for #{uri}: #{
-              inspect(reason)
-            }"
-          )
+        Logger.error(
+          "Unable to register agent for #{uri}: #{
+            inspect(reason)
+          }"
+        )
 
         error
     end
@@ -476,23 +489,19 @@ defmodule SNMP do
         end)
 
       {:error, {:invalid_oid, {:error, :not_found}}} ->
-        :ok = Logger.error("Unknown OID")
+        Logger.error("Unknown OID")
 
         {:error, :unknown_oid}
 
       {:error, {:invalid_oid, {:ok, oid}}} ->
         oid_string = Enum.join(oid, ".")
 
-        :ok =
-          Logger.error(
-            "Invalid OID #{inspect(oid_string)}"
-          )
+        Logger.error("Invalid OID #{inspect(oid_string)}")
 
         {:error, {:invalid_oid, oid}}
 
       {:error, {:send_failed, _, reason}} ->
-        :ok =
-          Logger.error("Send failed: #{inspect(reason)}")
+        Logger.error("Send failed: #{inspect(reason)}")
 
         {:error, reason}
 
@@ -501,23 +510,21 @@ defmodule SNMP do
 
         name = usm_stat_oid_to_name(oid)
 
-        :ok =
-          Logger.error(
-            "Received USM stats response: #{name}"
-          )
+        Logger.error(
+          "Received USM stats response: #{name}"
+        )
 
         {:error, name}
 
       {:error, {:timeout, _}} ->
-        :ok = Logger.error("Timeout!")
+        Logger.error("Timeout!")
 
         {:error, :etimedout}
 
       other ->
-        :ok =
-          Logger.error(
-            "Unexpected result: #{inspect(other)}"
-          )
+        Logger.error(
+          "Unexpected result: #{inspect(other)}"
+        )
 
         {:error, :unknown_error}
     end
@@ -567,32 +574,24 @@ defmodule SNMP do
   defp is_dotted_decimal(_string),
     do: false
 
-  defp normalize_to_oids([[]]),
-    do: []
+  def normalize_to_oid(object) do
+    cond do
+      :snmp_misc.is_oid(object) ->
+        [object]
 
-  defp normalize_to_oids(objects) do
-    objects
-    |> Enum.reduce([], fn object, acc ->
-      cond do
-        :snmp_misc.is_oid(object) ->
-          [object | acc]
+      is_dotted_decimal(object) ->
+        [string_oid_to_list(object)]
 
-        is_dotted_decimal(object) ->
-          [string_oid_to_list(object) | acc]
+      is_atom(object) ->
+        {:ok, oid} = resolve_object_name_to_oid(object)
+        [oid]
 
-        is_atom(object) ->
-          {:ok, oid} = resolve_object_name_to_oid(object)
+      true ->
+        atom = String.to_atom(object)
+        {:ok, oid} = resolve_object_name_to_oid(atom)
 
-          [oid | acc]
-
-        true ->
-          atom = String.to_atom(object)
-          {:ok, oid} = resolve_object_name_to_oid(atom)
-
-          [oid | acc]
-      end
-    end)
-    |> Enum.reverse()
+        [oid]
+    end
   end
 
   defp normalize_to_uri(%URI{} = uri),
@@ -608,11 +607,49 @@ defmodule SNMP do
     end
   end
 
+  defp normalize_to_snmp_value_type("i"), do: {:ok, :i}
 
-          __MODULE__,
-          target,
-        )
-    end
+  defp normalize_to_snmp_value_type("integer"),
+    do: {:ok, :i}
+
+  defp normalize_to_snmp_value_type("u"), do: {:ok, :u}
+
+  defp normalize_to_snmp_value_type("unsigned"),
+    do: {:ok, :u}
+
+  defp normalize_to_snmp_value_type("t"), do: {:ok, :t}
+
+  defp normalize_to_snmp_value_type("timeticks"),
+    do: {:ok, :t}
+
+  defp normalize_to_snmp_value_type("a"), do: {:ok, :a}
+
+  defp normalize_to_snmp_value_type("ipaddress"),
+    do: {:ok, :a}
+
+  defp normalize_to_snmp_value_type("o"), do: {:ok, :o}
+
+  defp normalize_to_snmp_value_type("object"),
+    do: {:ok, :o}
+
+  defp normalize_to_snmp_value_type("s"), do: {:ok, :s}
+
+  defp normalize_to_snmp_value_type("string"),
+    do: {:ok, :s}
+
+  defp normalize_to_snmp_value_type("x"), do: {:ok, :x}
+  defp normalize_to_snmp_value_type("hex"), do: {:ok, :x}
+  defp normalize_to_snmp_value_type("d"), do: {:ok, :d}
+
+  defp normalize_to_snmp_value_type("decimal"),
+    do: {:ok, :d}
+
+  defp normalize_to_snmp_value_type("b"), do: {:ok, :b}
+  defp normalize_to_snmp_value_type("bits"), do: {:ok, :b}
+
+  defp normalize_to_snmp_value_type(type) do
+    Logger.error("Invalid SNMP ValueType #{type}")
+    {:error, "#{type} not a known SNMP ValueType"}
   end
 
   defp perform_snmp_op(
@@ -622,7 +659,7 @@ defmodule SNMP do
          credential,
          options
        ) do
-    [oid, target, erl_context] =
+    [oid, target] =
       prepare_perform_snmp_op(
         object,
         agent,
@@ -630,28 +667,61 @@ defmodule SNMP do
         options
       )
 
+    options = Keyword.put(options, :timeout, timeout())
+
     result =
       case op do
         :get ->
-          :snmpm.sync_get(
+          :snmpm.sync_get2(
             __MODULE__,
             target,
-            erl_context,
             oid,
-            timeout()
+            options
           )
 
         :get_next ->
-          :snmpm.sync_get_next(
+          :snmpm.sync_get_next2(
             __MODULE__,
             target,
-            erl_context,
             oid,
-            timeout()
+            options
           )
       end
 
     groom_snmp_result(result)
+  end
+
+  defp perform_snmp_op(
+         :set,
+         object,
+         agent,
+         credential,
+         value,
+         value_type,
+         options
+       ) do
+    [oid, target] =
+      prepare_perform_snmp_op(
+        object,
+        agent,
+        credential,
+        options
+      )
+
+    with {:ok, snmp_value_type} <-
+           normalize_to_snmp_value_type(value_type) do
+      var_and_val = [{oid, snmp_value_type, value}]
+
+      result =
+        :snmpm.sync_set2(
+          __MODULE__,
+          target,
+          var_and_val,
+          timeout: timeout()
+        )
+
+      groom_snmp_result(result)
+    end
   end
 
   defp prepare_perform_snmp_op(
@@ -666,11 +736,6 @@ defmodule SNMP do
            |> resolve_host_in_uri do
       oid = normalize_to_oid(object)
       target = generate_target_name(uri, credential)
-
-      erl_context =
-        options
-        |> Keyword.get(:context, "")
-        |> :binary.bin_to_list()
 
       discover_fun = fn ->
         case discover_engine_id(uri, target) do
@@ -700,7 +765,7 @@ defmodule SNMP do
           target
         )
 
-      [oid, target, erl_context]
+      [oid, target]
     end
   end
 

@@ -1,0 +1,49 @@
+version: '3'
+
+services:
+  snmp:
+    image: tandrup/snmpsim
+    ports:
+      - '1161:161/udp'
+
+  snmp_v3_md5_none:
+    image: tandrup/snmpsim
+    ports:
+      - '1162:161/udp'
+    environment:
+      - EXTRA_FLAGS=--v3-only --v3-user=testing --v3-auth-proto=MD5 --v3-auth-key=authkey1
+
+  snmp_v3_sha_none:
+    image: tandrup/snmpsim
+    ports:
+      - '1163:161/udp'
+    environment:
+      - EXTRA_FLAGS=--v3-only --v3-user=testing --v3-auth-proto=SHA --v3-auth-key=authkey1
+
+  snmp_v3_md5_des:
+    image: tandrup/snmpsim
+    ports:
+      - '1164:161/udp'
+    environment:
+      - EXTRA_FLAGS=--v3-only --v3-user=testing --v3-auth-proto=MD5 --v3-priv-proto=DES --v3-auth-key=authkey1 --v3-priv-key=privkey1
+
+  snmp_v3_md5_aes:
+    image: tandrup/snmpsim
+    ports:
+      - '1165:161/udp'
+    environment:
+      - EXTRA_FLAGS=--v3-only --v3-user=testing --v3-auth-proto=MD5 --v3-priv-proto=AES --v3-auth-key=authkey1 --v3-priv-key=privkey1
+
+  snmp_v3_sha_des:
+    image: tandrup/snmpsim
+    ports:
+      - '1166:161/udp'
+    environment:
+      - EXTRA_FLAGS=--v3-only --v3-user=testing --v3-auth-proto=SHA --v3-priv-proto=DES --v3-auth-key=authkey1 --v3-priv-key=privkey1
+
+  snmp_v3_sha_aes:
+    image: tandrup/snmpsim
+    ports:
+      - '1167:161/udp'
+    environment:
+      - EXTRA_FLAGS=--v3-only --v3-user=testing --v3-auth-proto=SHA --v3-priv-proto=AES --v3-auth-key=authkey1 --v3-priv-key=privkey1
