@@ -527,7 +527,8 @@ defmodule SNMP do
     timeout =
       Application.get_env(
         :snmp_ex,
-        :engine_discovery_timeout
+        :engine_discovery_timeout,
+        1000
       )
 
     with {:error, _} <-

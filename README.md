@@ -78,7 +78,6 @@ Any of the following defaults may be overridden in your
 ```
 config :snmp_ex,
   timeout: 5000,
-  max_repetitions: 10,
   engine_discovery_timeout: 1000,
   mib_cache:      "priv/snmp/mibs",
   snmp_conf_dir:  "priv/snmp/conf",
