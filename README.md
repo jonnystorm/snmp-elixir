@@ -68,7 +68,7 @@ Add `:snmp_ex` to `mix.exs`:
 
 ```
 defp deps do
-  [ { :snmp_ex, "~> 0.2.0" } ]
+  [ { :snmp_ex, "~> 0.3.0" } ]
 end
 ```
 
