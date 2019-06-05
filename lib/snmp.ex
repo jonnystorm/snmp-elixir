@@ -520,7 +520,7 @@ defmodule SNMP do
   defp normalize_to_snmp_value_type("bits"), do: {:ok, :b}
 
   defp normalize_to_snmp_value_type(type) do
-    Logger.error("Invalid SNMP ValueType #{type}")
+    :ok = Logger.error("Invalid SNMP ValueType #{type}")
     {:error, "#{type} not a known SNMP ValueType"}
   end
 
