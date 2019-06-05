@@ -214,4 +214,64 @@ defmodule SNMP.Test do
       end
     end
   end
+
+  describe "v1" do
+    test "set" do
+      cred = SNMP.credential(:v1, "public")
+
+      result =
+        SNMP.set(
+          @sysname_oid,
+          @working_agent,
+          cred,
+          "test",
+          "string"
+        )
+
+      assert result == [
+               {@sysname_oid, :"OCTET STRING", 'test'}
+             ]
+
+      result =
+        SNMP.get(
+          @sysname_oid,
+          @working_agent,
+          cred
+        )
+
+      assert result == [
+               {@sysname_oid, :"OCTET STRING", 'test'}
+             ]
+    end
+  end
+
+  describe "v2" do
+    test "set" do
+      cred = SNMP.credential(:v2c, "public")
+
+      result =
+        SNMP.set(
+          @sysname_oid,
+          @working_agent,
+          cred,
+          "test",
+          "string"
+        )
+
+      assert result == [
+               {@sysname_oid, :"OCTET STRING", 'test'}
+             ]
+
+      result =
+        SNMP.get(
+          @sysname_oid,
+          @working_agent,
+          cred
+        )
+
+      assert result == [
+               {@sysname_oid, :"OCTET STRING", 'test'}
+             ]
+    end
+  end
 end

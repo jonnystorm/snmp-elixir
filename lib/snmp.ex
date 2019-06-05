@@ -479,6 +479,51 @@ defmodule SNMP do
     :ok
   end
 
+  defp normalize_to_snmp_value_type("i"), do: {:ok, :i}
+
+  defp normalize_to_snmp_value_type("integer"),
+    do: {:ok, :i}
+
+  defp normalize_to_snmp_value_type("u"), do: {:ok, :u}
+
+  defp normalize_to_snmp_value_type("unsigned"),
+    do: {:ok, :u}
+
+  defp normalize_to_snmp_value_type("t"), do: {:ok, :t}
+
+  defp normalize_to_snmp_value_type("timeticks"),
+    do: {:ok, :t}
+
+  defp normalize_to_snmp_value_type("a"), do: {:ok, :a}
+
+  defp normalize_to_snmp_value_type("ipaddress"),
+    do: {:ok, :a}
+
+  defp normalize_to_snmp_value_type("o"), do: {:ok, :o}
+
+  defp normalize_to_snmp_value_type("object"),
+    do: {:ok, :o}
+
+  defp normalize_to_snmp_value_type("s"), do: {:ok, :s}
+
+  defp normalize_to_snmp_value_type("string"),
+    do: {:ok, :s}
+
+  defp normalize_to_snmp_value_type("x"), do: {:ok, :x}
+  defp normalize_to_snmp_value_type("hex"), do: {:ok, :x}
+  defp normalize_to_snmp_value_type("d"), do: {:ok, :d}
+
+  defp normalize_to_snmp_value_type("decimal"),
+    do: {:ok, :d}
+
+  defp normalize_to_snmp_value_type("b"), do: {:ok, :b}
+  defp normalize_to_snmp_value_type("bits"), do: {:ok, :b}
+
+  defp normalize_to_snmp_value_type(type) do
+    :ok = Logger.error("Invalid SNMP ValueType #{type}")
+    {:error, "#{type} not a known SNMP ValueType"}
+  end
+
   defp sha_sum(string) when is_binary(string),
     do: :crypto.hash(:sha, string)
 
@@ -619,6 +664,66 @@ defmodule SNMP do
     end
   end
 
+  defp perform_snmp_op(
+         :set,
+         objects,
+         agent,
+         credential,
+         value,
+         value_type,
+         options
+       ) do
+    with {:ok, uri} <-
+           agent
+           |> normalize_to_uri
+           |> resolve_host_in_uri do
+      oids = normalize_to_oids(objects)
+      target = generate_target_name(uri, credential)
+
+      {:ok, snmp_value_type} =
+        normalize_to_snmp_value_type(value_type)
+
+      discover_fun = fn ->
+        case discover_engine_id(uri, target) do
+          {:ok, eid} -> :binary.list_to_bin(eid)
+          {:error, _} -> Utility.local_engine_id()
+        end
+      end
+
+      engine_id =
+        options
+        |> Keyword.get_lazy(:engine_id, discover_fun)
+        |> :binary.bin_to_list()
+
+      with :ok <-
+             register_usm_user(credential, engine_id),
+           :ok <-
+             register_agent(
+               target,
+               uri,
+               credential,
+               engine_id
+             ),
+           :ok <-
+             warmup_engine_boots_and_engine_time(
+               engine_id,
+               target
+             ) do
+        var_and_val = [{oids, snmp_value_type, value}]
+
+        result =
+          :snmpm.sync_set2(
+            __MODULE__,
+            target,
+            var_and_val,
+            timeout: get_timeout()
+          )
+
+        groom_snmp_result(result)
+      end
+    end
+  end
+
   defp generate_target_name(uri, credential) do
     # Make a concise target name that is unique per host,
     # per credential
@@ -645,6 +750,54 @@ defmodule SNMP do
 
   def get(object, agent, credential, options),
     do: get([object], agent, credential, options)
+
+  def set(
+        objects,
+        agent,
+        credential,
+        value,
+        value_type,
+        options \\ []
+      )
+
+  def set(
+        [h | _] = objects,
+        agent,
+        credential,
+        value,
+        value_type,
+        options
+      )
+      when is_list(h) or
+             is_binary(h) do
+    perform_snmp_op(
+      :set,
+      objects,
+      agent,
+      credential,
+      value,
+      value_type,
+      options
+    )
+  end
+
+  def set(
+        object,
+        agent,
+        credential,
+        value,
+        value_type,
+        options
+      ) do
+    set(
+      [object],
+      agent,
+      credential,
+      value,
+      value_type,
+      options
+    )
+  end
 
   def get_next(objects, agent, credential, options \\ [])
 
