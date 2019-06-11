@@ -559,7 +559,7 @@ defmodule SNMP do
   defp normalize_to_snmp_value_type("counter64", _value),
     do: {:ok, :c64}
 
-  defp normalize_to_snmp_value_type(type), _value do
+  defp normalize_to_snmp_value_type(type, _value) do
     :ok = Logger.error("Invalid SNMP ValueType #{type}")
     {:error, "#{type} not a known SNMP ValueType"}
   end
