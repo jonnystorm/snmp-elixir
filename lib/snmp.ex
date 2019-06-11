@@ -479,56 +479,87 @@ defmodule SNMP do
     :ok
   end
 
-  defp normalize_to_snmp_value_type("i"), do: {:ok, :i}
-
-  defp normalize_to_snmp_value_type("integer"),
+  defp normalize_to_snmp_value_type("i", _value),
     do: {:ok, :i}
 
-  defp normalize_to_snmp_value_type("u"), do: {:ok, :u}
-  defp normalize_to_snmp_value_type("g"), do: {:ok, :g}
+  defp normalize_to_snmp_value_type("integer", _value),
+    do: {:ok, :i}
 
-  defp normalize_to_snmp_value_type("unsigned"),
+  defp normalize_to_snmp_value_type("u", _value),
     do: {:ok, :u}
 
-  defp normalize_to_snmp_value_type("t"), do: {:ok, :tt}
+  defp normalize_to_snmp_value_type("g", _value),
+    do: {:ok, :g}
 
-  defp normalize_to_snmp_value_type("timeticks"),
+  defp normalize_to_snmp_value_type("unsigned", _value),
+    do: {:ok, :u}
+
+  defp normalize_to_snmp_value_type("t", _value),
     do: {:ok, :tt}
 
-  defp normalize_to_snmp_value_type("o"), do: {:ok, :o}
+  defp normalize_to_snmp_value_type("timeticks", _value),
+    do: {:ok, :tt}
 
-  defp normalize_to_snmp_value_type("object"),
+  defp normalize_to_snmp_value_type("o", _value),
     do: {:ok, :o}
 
-  defp normalize_to_snmp_value_type("ip"), do: {:ok, :ip}
+  defp normalize_to_snmp_value_type("object", _value),
+    do: {:ok, :o}
 
-  defp normalize_to_snmp_value_type("ipaddress"),
-    do: {:ok, :ip}
+  defp normalize_to_snmp_value_type("ip", value)
+       when is_list(value) do
+    {:ok, :ip}
+  end
 
-  defp normalize_to_snmp_value_type("s"), do: {:ok, :s}
+  defp normalize_to_snmp_value_type("ipaddress", value)
+       when is_list(value) do
+    {:ok, :ip}
+  end
 
-  defp normalize_to_snmp_value_type("string"),
+  defp normalize_to_snmp_value_type("ip", value) do
+    normalize_to_snmp_value_type("ipaddress", value)
+  end
+
+  defp normalize_to_snmp_value_type("ipaddress", _value) do
+    :ok =
+      Logger.error(
+        "ip should be a list like: {A, B, C, D}"
+      )
+
+    {:error, "ip should be a list like: {A, B, C, D}"}
+  end
+
+  defp normalize_to_snmp_value_type("s", _value),
     do: {:ok, :s}
 
-  defp normalize_to_snmp_value_type("b"), do: {:ok, :b}
-  defp normalize_to_snmp_value_type("bits"), do: {:ok, :b}
+  defp normalize_to_snmp_value_type("string", _value),
+    do: {:ok, :s}
 
-  defp normalize_to_snmp_value_type("op"), do: {:ok, :op}
+  defp normalize_to_snmp_value_type("b", _value),
+    do: {:ok, :b}
 
-  defp normalize_to_snmp_value_type("opaque"),
+  defp normalize_to_snmp_value_type("bits", _value),
+    do: {:ok, :b}
+
+  defp normalize_to_snmp_value_type("op", _value),
     do: {:ok, :op}
 
-  defp normalize_to_snmp_value_type("c32"), do: {:ok, :c32}
+  defp normalize_to_snmp_value_type("opaque", _value),
+    do: {:ok, :op}
 
-  defp normalize_to_snmp_value_type("counter32"),
+  defp normalize_to_snmp_value_type("c32", _value),
     do: {:ok, :c32}
 
-  defp normalize_to_snmp_value_type("c64"), do: {:ok, :c64}
+  defp normalize_to_snmp_value_type("counter32", _value),
+    do: {:ok, :c32}
 
-  defp normalize_to_snmp_value_type("counter64"),
+  defp normalize_to_snmp_value_type("c64", _value),
     do: {:ok, :c64}
 
-  defp normalize_to_snmp_value_type(type) do
+  defp normalize_to_snmp_value_type("counter64", _value),
+    do: {:ok, :c64}
+
+  defp normalize_to_snmp_value_type(type), _value do
     :ok = Logger.error("Invalid SNMP ValueType #{type}")
     {:error, "#{type} not a known SNMP ValueType"}
   end
@@ -690,7 +721,7 @@ defmodule SNMP do
       target = generate_target_name(uri, credential)
 
       {:ok, snmp_value_type} =
-        normalize_to_snmp_value_type(value_type)
+        normalize_to_snmp_value_type(value_type, value)
 
       discover_fun = fn ->
         case discover_engine_id(uri, target) do
