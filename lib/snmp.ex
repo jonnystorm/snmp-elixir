@@ -485,39 +485,48 @@ defmodule SNMP do
     do: {:ok, :i}
 
   defp normalize_to_snmp_value_type("u"), do: {:ok, :u}
+  defp normalize_to_snmp_value_type("g"), do: {:ok, :g}
 
   defp normalize_to_snmp_value_type("unsigned"),
     do: {:ok, :u}
 
-  defp normalize_to_snmp_value_type("t"), do: {:ok, :t}
+  defp normalize_to_snmp_value_type("t"), do: {:ok, :tt}
 
   defp normalize_to_snmp_value_type("timeticks"),
-    do: {:ok, :t}
-
-  defp normalize_to_snmp_value_type("a"), do: {:ok, :a}
-
-  defp normalize_to_snmp_value_type("ipaddress"),
-    do: {:ok, :a}
+    do: {:ok, :tt}
 
   defp normalize_to_snmp_value_type("o"), do: {:ok, :o}
 
   defp normalize_to_snmp_value_type("object"),
     do: {:ok, :o}
 
+  defp normalize_to_snmp_value_type("ip"), do: {:ok, :ip}
+
+  defp normalize_to_snmp_value_type("ipaddress"),
+    do: {:ok, :ip}
+
   defp normalize_to_snmp_value_type("s"), do: {:ok, :s}
 
   defp normalize_to_snmp_value_type("string"),
     do: {:ok, :s}
 
-  defp normalize_to_snmp_value_type("x"), do: {:ok, :x}
-  defp normalize_to_snmp_value_type("hex"), do: {:ok, :x}
-  defp normalize_to_snmp_value_type("d"), do: {:ok, :d}
-
-  defp normalize_to_snmp_value_type("decimal"),
-    do: {:ok, :d}
-
   defp normalize_to_snmp_value_type("b"), do: {:ok, :b}
   defp normalize_to_snmp_value_type("bits"), do: {:ok, :b}
+
+  defp normalize_to_snmp_value_type("op"), do: {:ok, :op}
+
+  defp normalize_to_snmp_value_type("opaque"),
+    do: {:ok, :op}
+
+  defp normalize_to_snmp_value_type("c32"), do: {:ok, :c32}
+
+  defp normalize_to_snmp_value_type("counter32"),
+    do: {:ok, :c32}
+
+  defp normalize_to_snmp_value_type("c64"), do: {:ok, :c64}
+
+  defp normalize_to_snmp_value_type("counter64"),
+    do: {:ok, :c64}
 
   defp normalize_to_snmp_value_type(type) do
     :ok = Logger.error("Invalid SNMP ValueType #{type}")
