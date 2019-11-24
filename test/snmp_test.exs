@@ -8,10 +8,10 @@ defmodule SNMP.Test do
   @moduletag :integrated
 
   @sysname_oid [1, 3, 6, 1, 2, 1, 1, 5, 0]
-  @sysname_value {
-    @sysname_oid,
-    :"OCTET STRING",
-    'new sys name'
+  @sysname_result %{
+    oid: @sysname_oid,
+    type: :"OCTET STRING",
+    value: "new sys name"
   }
 
   # Presumably working agent, but has frequent troubles
@@ -20,38 +20,30 @@ defmodule SNMP.Test do
   # Optimistically, should be a broken agent
   @borking_agent "localhost:65535"
 
-  defp get_credential(:none, :none) do
-    SNMP.credential([
-      :v3,
-      :no_auth_no_priv,
-      "usr-none-none"
-    ])
-  end
+  defp get_credential(:none, :none),
+    do: SNMP.credential(%{sec_name: "usr-none-none"})
 
   defp get_credential(auth, :none)
-       when auth in [:md5, :sha] do
-    SNMP.credential([
-      :v3,
-      :auth_no_priv,
-      "usr-#{Atom.to_string(auth)}-none",
-      auth,
-      "authkey1"
-    ])
+      when auth in [:md5, :sha]
+  do
+    %{sec_name: "usr-#{auth}-none",
+      auth: auth,
+      auth_pass: "authkey1",
+    }
+    |> SNMP.credential
   end
 
   defp get_credential(auth, priv)
       when auth in [:md5, :sha]
        and priv in [:des, :aes]
   do
-    SNMP.credential([
-      :v3,
-      :auth_priv,
-      "usr-#{Atom.to_string(auth)}-#{Atom.to_string(priv)}",
-      auth,
-      "authkey1",
-      priv,
-      "privkey1"
-    ])
+    %{sec_name: "usr-#{auth}-#{priv}",
+      auth: auth,
+      auth_pass: "authkey1",
+      priv: priv,
+      priv_pass: "privkey1"
+    }
+    |> SNMP.credential
   end
 
   defp get_sysname_with_engine_id(credential, agent) do
@@ -63,7 +55,11 @@ defmodule SNMP.Test do
   end
 
   defp get_sysname(credential, agent, opts \\ []) do
-    SNMP.get(@sysname_oid, agent, credential, opts)
+    %{uri: URI.parse("snmp://#{agent}"),
+      credential: credential,
+      varbinds: [%{oid: @sysname_oid}],
+    }
+    |> SNMP.request(opts)
   end
 
   test "Hostname resolution breaks gracefully" do
@@ -84,7 +80,7 @@ defmodule SNMP.Test do
         |> get_credential(:none)
         |> get_sysname_with_engine_id(@working_agent)
 
-      assert result == [@sysname_value]
+      assert result == [@sysname_result]
     end
 
     test "timeout without engine discovery" do
@@ -102,7 +98,7 @@ defmodule SNMP.Test do
         |> get_credential(:none)
         |> get_sysname(@working_agent)
 
-      assert result == [@sysname_value]
+      assert result == [@sysname_result]
     end
 
     test "timeout with engine discovery" do
@@ -123,7 +119,7 @@ defmodule SNMP.Test do
           |> get_credential(:none)
           |> get_sysname_with_engine_id(@working_agent)
 
-        assert result == [@sysname_value]
+        assert result == [@sysname_result]
       end
     end
 
@@ -145,7 +141,7 @@ defmodule SNMP.Test do
           |> get_credential(:none)
           |> get_sysname(@working_agent)
 
-        assert result == [@sysname_value]
+        assert result == [@sysname_result]
       end
     end
 
@@ -171,7 +167,7 @@ defmodule SNMP.Test do
           |> get_credential(priv)
           |> get_sysname_with_engine_id(@working_agent)
 
-        assert result == [@sysname_value]
+        assert result == [@sysname_result]
       end
     end
 
@@ -197,7 +193,7 @@ defmodule SNMP.Test do
           |> get_credential(priv)
           |> get_sysname(@working_agent)
 
-        assert result == [@sysname_value]
+        assert result == [@sysname_result]
       end
     end
 
@@ -217,61 +213,115 @@ defmodule SNMP.Test do
 
   describe "v1" do
     test "set" do
-      cred = SNMP.credential(:v1, "public")
+      uri  = URI.parse("snmp://#{@working_agent}")
+      cred = SNMP.credential(%{community: "public"})
 
-      result =
-        SNMP.set(
-          @sysname_oid,
-          @working_agent,
-          cred,
-          "test",
-          "string"
-        )
+      before_set =
+        %{uri: uri,
+          credential: cred,
+          varbinds: [%{oid: @sysname_oid}],
+        }
+        |> SNMP.request
 
-      assert result == [
-               {@sysname_oid, :"OCTET STRING", 'test'}
-             ]
+      refute before_set ==
+        [ { :ok,
+            %{oid: @sysname_oid,
+              type: :"OCTET STRING",
+              value: 'test',
+            }
+          }
+        ]
 
-      result =
-        SNMP.get(
-          @sysname_oid,
-          @working_agent,
-          cred
-        )
+      set_result =
+        %{uri: uri,
+          credential: cred,
+          varbinds: [%{oid: @sysname_oid, value: "test"}],
+        }
+        |> SNMP.request
 
-      assert result == [
-               {@sysname_oid, :"OCTET STRING", 'test'}
-             ]
+      assert set_result ==
+        [ { :ok,
+            %{oid: @sysname_oid,
+              type: :"OCTET STRING",
+              value: 'test',
+            }
+          }
+        ]
+
+      after_set =
+        %{uri: uri,
+          credential: cred,
+          varbinds: [%{oid: @sysname_oid}],
+        }
+        |> SNMP.request
+
+      assert after_set ==
+        [ { :ok,
+            %{oid: @sysname_oid,
+              type: :"OCTET STRING",
+              value: 'test',
+            }
+          }
+        ]
     end
   end
 
   describe "v2" do
     test "set" do
-      cred = SNMP.credential(:v2c, "public")
+      uri  = URI.parse("snmp://#{@working_agent}")
+      cred =
+        %{version: :v2,
+          community: "public",
+        }
+        |> SNMP.credential
 
-      result =
-        SNMP.set(
-          @sysname_oid,
-          @working_agent,
-          cred,
-          "test",
-          "string"
-        )
+      before_set =
+        %{uri: uri,
+          credential: cred,
+          varbinds: [%{oid: @sysname_oid}],
+        }
+        |> SNMP.request
 
-      assert result == [
-               {@sysname_oid, :"OCTET STRING", 'test'}
-             ]
+      refute before_set ==
+        [ { :ok,
+            %{oid: @sysname_oid,
+              type: :"OCTET STRING",
+              value: "test",
+            }
+          }
+        ]
 
-      result =
-        SNMP.get(
-          @sysname_oid,
-          @working_agent,
-          cred
-        )
+      set_result =
+        %{uri: uri,
+          credential: cred,
+          varbinds: [%{oid: @sysname_oid, value: "test"}],
+        }
+        |> SNMP.request
 
-      assert result == [
-               {@sysname_oid, :"OCTET STRING", 'test'}
-             ]
+      assert set_result ==
+        [ { :ok,
+            %{oid: @sysname_oid,
+              type: :"OCTET STRING",
+              value: 'test',
+            }
+          }
+        ]
+
+      after_set =
+        %{uri: uri,
+          credential: cred,
+          varbinds: [%{oid: @sysname_oid}],
+        }
+        |> SNMP.request
+
+      assert after_set ==
+        [ { :ok,
+            %{oid: @sysname_oid,
+              type: :"OCTET STRING",
+              value: "test",
+            }
+          }
+        ]
     end
   end
 end
