@@ -18,7 +18,10 @@ problem.
 ```elixir
 iex> SNMP.start
 iex>
-iex> v2_cred = SNMP.credential([:v2c, "public"])
+iex> v2_cred =
+...>   SNMP.credential(
+...>     %{version: :v2, community: "public"}
+...>   )
 %SNMP.CommunityCredential{
   community: 'public',
   sec_model: :v2c,
@@ -29,21 +32,26 @@ iex> {:ok, base_oid} =
 ...>   SNMP.resolve_object_name_to_oid(:sysName)
 {:ok, [1, 3, 6, 1, 2, 1, 1, 5]}
 iex>
-iex> SNMP.get(base_oid ++ [0], "an-snmp-host.local", v2_cred)
+iex> %{uri: URI.parse("snmp://an-snmp-host.local"),
+...>   credential: v2_cred,
+...>   varbinds: [%{oid: base_oid ++ [0]}],
+...> } |> SNMP.request
 [
-  {[1, 3, 6, 1, 2, 1, 1, 5, 0], :"OCTET STRING", 'an-snmp-host'}
+  %{oid: [1, 3, 6, 1, 2, 1, 1, 5, 0],
+    type: :"OCTET STRING",
+    value: "an-snmp-host"
+  }
 ]
 iex>
 iex> v3_cred =
 ...>   SNMP.credential(
-...>     [ :v3,
-...>       :auth_priv,
-...>       "user",
-...>       :sha,
-...>       "authpass",
-...>       :aes,
-...>       "privpass",
-...>     ]
+...>     %{version: :v3,
+...>       sec_name: "user",
+...>       auth: :sha,
+...>       auth_pass: "authpass",
+...>       priv: :aes,
+...>       priv_pass: "privpass",
+...>     }
 ...>  )
 %SNMP.USMCredential{
   auth: :sha,
@@ -58,7 +66,10 @@ iex> v3_cred =
 iex> SNMP.walk("ipAddrTable", "an-snmp-host.local", v3_cred)
 ...> |> Enum.take(1)
 [
-  {[1, 3, 6, 1, 2, 1, 4, 20, 1, 1, 192, 0, 2, 1], :IpAddress, [192, 0, 2, 1]}
+  %{oid: [1, 3, 6, 1, 2, 1, 4, 20, 1, 1, 192, 0, 2, 1],
+    type: :IpAddress,
+    value: [192, 0, 2, 1],
+  }
 ]
 ```
 
@@ -68,7 +79,7 @@ Add `:snmp_ex` to `mix.exs`:
 
 ```
 defp deps do
-  [ { :snmp_ex, "~> 0.2.3" } ]
+  [ { :snmp_ex, "~> 0.3.1" } ]
 end
 ```
 
@@ -119,7 +130,7 @@ Better](http://hintjens.com/blog:106).
 * ~~USM engine discovery~~
 * SNMP tables
 * ~~MIB name resolution~~
-* Basic SNMP operations (~~GET~~, ~~GET-NEXT~~, ~~WALK~~, SET)
+* ~~Basic SNMP operations~~ (~~GET~~, ~~GET-NEXT~~, ~~WALK~~, ~~SET~~)
 * Bulk SNMP operations
 * Process management (~~supervision~~, `:snmpm` agents)
 * Make it decent
