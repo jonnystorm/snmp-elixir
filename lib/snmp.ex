@@ -26,9 +26,9 @@ defmodule SNMP do
 
   defmodule CommunityCredential do
     defstruct [
-      :version,
-      :sec_model,
-      :community,
+      version: :v1,
+      sec_model: :v1,
+      community: nil,
     ]
 
     @type t ::
@@ -43,11 +43,11 @@ defmodule SNMP do
     defstruct [
       version:   :v3,
       sec_model: :usm,
-      sec_level: nil,
+      sec_level: :noAuthNoPriv,
       sec_name:  [],
-      auth:      nil,
+      auth:      :usmNoAuthProtocol,
       auth_pass: nil,
-      priv:      nil,
+      priv:      :usmNoPrivProtocol,
       priv_pass: nil,
     ]
 
@@ -60,9 +60,15 @@ defmodule SNMP do
           | :authNoPriv
           | :authPriv,
         sec_name:  [byte],
-        auth:      nil | :md5 | :sha,
+        auth:
+            :usmNoAuthProtocol
+          | :usmHMACMD5AuthProtocol
+          | :usmHMACSHAAuthProtocol,
         auth_pass: nil | [byte],
-        priv:      nil | :des | :aes,
+        priv:
+            :usmNoPrivProtocol
+          | :usmDESPrivProtocol
+          | :usmAesCfb128Protocol,
         priv_pass: nil | [byte]
       }
   end
@@ -282,33 +288,34 @@ defmodule SNMP do
     priv      = credential.priv
     priv_pass = credential.priv_pass
 
+    hash_algo =
+      case auth do
+        :usmNoAuthProtocol      -> nil
+        :usmHMACMD5AuthProtocol -> :md5
+        :usmHMACSHAAuthProtocol -> :sha
+      end
+
     auth_key =
-      if is_nil(auth) do
+      if is_nil(auth_pass) do
         []
       else
-        auth
-        |> :snmp.passwd2localized_key(
-          auth_pass,
-          engine_id
-        )
+        hash_algo
+        |> :snmp.passwd2localized_key(auth_pass, engine_id)
       end
 
     priv_key =
-      if is_nil(priv) do
+      if is_nil(priv_pass) do
         []
       else
-        auth
-        |> :snmp.passwd2localized_key(
-          priv_pass,
-          engine_id
-        )
+        hash_algo
+        |> :snmp.passwd2localized_key(priv_pass, engine_id)
         |> Enum.slice(0..15)
       end
 
     [ sec_name: credential.sec_name,
-      auth:     auth_proto_to_snmpm_auth(auth),
+      auth:     auth,
       auth_key: auth_key,
-      priv:     priv_proto_to_snmpm_auth(priv),
+      priv:     priv,
       priv_key: priv_key
     ]
   end
@@ -479,91 +486,6 @@ defmodule SNMP do
     :ok
   end
 
-  defp normalize_to_snmp_value_type("i", _value),
-    do: {:ok, :i}
-
-  defp normalize_to_snmp_value_type("integer", _value),
-    do: {:ok, :i}
-
-  defp normalize_to_snmp_value_type("u", _value),
-    do: {:ok, :u}
-
-  defp normalize_to_snmp_value_type("g", _value),
-    do: {:ok, :g}
-
-  defp normalize_to_snmp_value_type("unsigned", _value),
-    do: {:ok, :u}
-
-  defp normalize_to_snmp_value_type("t", _value),
-    do: {:ok, :tt}
-
-  defp normalize_to_snmp_value_type("timeticks", _value),
-    do: {:ok, :tt}
-
-  defp normalize_to_snmp_value_type("o", _value),
-    do: {:ok, :o}
-
-  defp normalize_to_snmp_value_type("object", _value),
-    do: {:ok, :o}
-
-  defp normalize_to_snmp_value_type("ip", value)
-       when is_list(value) do
-    {:ok, :ip}
-  end
-
-  defp normalize_to_snmp_value_type("ipaddress", value)
-       when is_list(value) do
-    {:ok, :ip}
-  end
-
-  defp normalize_to_snmp_value_type("ip", value) do
-    normalize_to_snmp_value_type("ipaddress", value)
-  end
-
-  defp normalize_to_snmp_value_type("ipaddress", _value) do
-    :ok =
-      Logger.error(
-        "ip should be a list like: {A, B, C, D}"
-      )
-
-    {:error, "ip should be a list like: {A, B, C, D}"}
-  end
-
-  defp normalize_to_snmp_value_type("s", _value),
-    do: {:ok, :s}
-
-  defp normalize_to_snmp_value_type("string", _value),
-    do: {:ok, :s}
-
-  defp normalize_to_snmp_value_type("b", _value),
-    do: {:ok, :b}
-
-  defp normalize_to_snmp_value_type("bits", _value),
-    do: {:ok, :b}
-
-  defp normalize_to_snmp_value_type("op", _value),
-    do: {:ok, :op}
-
-  defp normalize_to_snmp_value_type("opaque", _value),
-    do: {:ok, :op}
-
-  defp normalize_to_snmp_value_type("c32", _value),
-    do: {:ok, :c32}
-
-  defp normalize_to_snmp_value_type("counter32", _value),
-    do: {:ok, :c32}
-
-  defp normalize_to_snmp_value_type("c64", _value),
-    do: {:ok, :c64}
-
-  defp normalize_to_snmp_value_type("counter64", _value),
-    do: {:ok, :c64}
-
-  defp normalize_to_snmp_value_type(type, _value) do
-    :ok = Logger.error("Invalid SNMP ValueType #{type}")
-    {:error, "#{type} not a known SNMP ValueType"}
-  end
-
   defp sha_sum(string) when is_binary(string),
     do: :crypto.hash(:sha, string)
 
@@ -582,48 +504,40 @@ defmodule SNMP do
     |> Enum.reduce([], fn object, acc ->
       cond do
         :snmp_misc.is_oid(object) ->
-          [object | acc]
+          [object|acc]
 
         is_dotted_decimal(object) ->
-          [string_oid_to_list(object) | acc]
+          [string_oid_to_list(object)|acc]
 
         is_atom(object) ->
           {:ok, oid} = resolve_object_name_to_oid(object)
 
-          [oid | acc]
+          [oid|acc]
 
         true ->
           atom = String.to_atom(object)
           {:ok, oid} = resolve_object_name_to_oid(atom)
 
-          [oid | acc]
+          [oid|acc]
       end
     end)
     |> Enum.reverse()
   end
 
-  defp normalize_to_uri(%URI{} = uri),
-    do: uri
-
-  defp normalize_to_uri(agent) when is_binary(agent) do
-    cond do
-      agent =~ ~r|^snmp://| ->
-        URI.parse(agent)
-
-      true ->
-        URI.parse("snmp://#{agent}")
-    end
-  end
-
   defp _perform_snmp_op(
     op,
-    oids,
+    varbinds,
     target,
     context,
     timeout
   ) do
     case op do
       :get ->
+        oids =
+          varbinds
+          |> Enum.map(& &1.oid)
+          |> normalize_to_oids
+
         :snmpm.sync_get(
           __MODULE__,
           target,
@@ -633,6 +547,11 @@ defmodule SNMP do
         )
 
       :get_next ->
+        oids =
+          varbinds
+          |> Enum.map(& &1.oid)
+          |> normalize_to_oids
+
         :snmpm.sync_get_next(
           __MODULE__,
           target,
@@ -640,127 +559,71 @@ defmodule SNMP do
           oids,
           timeout
         )
+
+      :set ->
+        vars_and_vals =
+          Enum.map(varbinds, & {&1.oid, &1.value})
+
+        :snmpm.sync_set(
+          __MODULE__,
+          target,
+          context,
+          vars_and_vals,
+          timeout
+        )
     end
   end
 
   defp perform_snmp_op(
     op,
-    objects,
-    agent,
+    varbinds,
+    uri,
     credential,
     options
   ) do
-    with {:ok, uri} <-
-           agent
-           |> normalize_to_uri
-           |> resolve_host_in_uri
-    do
-      oids = normalize_to_oids(objects)
-      target = generate_target_name(uri, credential)
+    target      = generate_target_name(uri, credential)
+    erl_context =
+      options
+      |> Keyword.get(:context, "")
+      |> :binary.bin_to_list()
 
-      erl_context =
-        options
-        |> Keyword.get(:context, "")
-        |> :binary.bin_to_list()
-
-      discover_fun = fn ->
-        case discover_engine_id(uri, target) do
-          {:ok, eid} -> :binary.list_to_bin(eid)
-          {:error, _} -> Utility.local_engine_id()
-        end
-      end
-
-      engine_id =
-        options
-        |> Keyword.get_lazy(:engine_id, discover_fun)
-        |> :binary.bin_to_list()
-
-      with :ok <-
-             register_usm_user(credential, engine_id),
-           :ok <-
-             register_agent(
-               target,
-               uri,
-               credential,
-               engine_id
-             ),
-           :ok <-
-             warmup_engine_boots_and_engine_time(
-               engine_id,
-               target
-             )
-      do
-        result =
-          _perform_snmp_op(
-            op,
-            oids,
-            target,
-            erl_context,
-            get_timeout()
-          )
-
-        groom_snmp_result(result)
+    discover_fun = fn ->
+      case discover_engine_id(uri, target) do
+        {:ok,  eid} -> :binary.list_to_bin(eid)
+        {:error, _} -> Utility.local_engine_id()
       end
     end
-  end
 
-  defp perform_snmp_op(
-         :set,
-         objects,
-         agent,
-         credential,
-         value,
-         value_type,
-         options
-       ) do
-    with {:ok, uri} <-
-           agent
-           |> normalize_to_uri
-           |> resolve_host_in_uri do
-      oids = normalize_to_oids(objects)
-      target = generate_target_name(uri, credential)
+    engine_id =
+      options
+      |> Keyword.get_lazy(:engine_id, discover_fun)
+      |> :binary.bin_to_list()
 
-      {:ok, snmp_value_type} =
-        normalize_to_snmp_value_type(value_type, value)
+    with :ok <-
+           register_usm_user(credential, engine_id),
+         :ok <-
+           register_agent(
+             target,
+             uri,
+             credential,
+             engine_id
+           ),
+         :ok <-
+           warmup_engine_boots_and_engine_time(
+             engine_id,
+             target
+           )
+    do
+      result =
+        _perform_snmp_op(
+          op,
+          varbinds,
+          target,
+          erl_context,
+          get_timeout()
+        )
 
-      discover_fun = fn ->
-        case discover_engine_id(uri, target) do
-          {:ok, eid} -> :binary.list_to_bin(eid)
-          {:error, _} -> Utility.local_engine_id()
-        end
-      end
-
-      engine_id =
-        options
-        |> Keyword.get_lazy(:engine_id, discover_fun)
-        |> :binary.bin_to_list()
-
-      with :ok <-
-             register_usm_user(credential, engine_id),
-           :ok <-
-             register_agent(
-               target,
-               uri,
-               credential,
-               engine_id
-             ),
-           :ok <-
-             warmup_engine_boots_and_engine_time(
-               engine_id,
-               target
-             ) do
-        var_and_val = [{oids, snmp_value_type, value}]
-
-        result =
-          :snmpm.sync_set2(
-            __MODULE__,
-            target,
-            var_and_val,
-            timeout: get_timeout()
-          )
-
-        groom_snmp_result(result)
-      end
+      groom_snmp_result(result)
     end
   end
 
@@ -773,105 +636,90 @@ defmodule SNMP do
     |> :binary.bin_to_list()
   end
 
-  def get(objects, agent, credential, options \\ [])
+  @type object_name :: binary
 
-  def get([h | _] = objects, agent, credential, options)
-      when is_list(h)
-        or is_binary(h)
+  @type object_id
+    :: object_name
+     | [non_neg_integer, ...]
+
+  @type asn1_type  :: atom | binary
+  @type asn1_value :: any
+  @type credential :: map
+
+  @type req_varbind
+    :: %{oid: object_id}
+     | %{oid: object_id, type: asn1_type}
+     | %{oid: object_id, type: asn1_type, value: asn1_value}
+
+  @type varbind
+    :: %{oid:   object_id,
+         type:  asn1_type,
+         value: asn1_value,
+       }
+
+  @type req_params
+    :: %{uri: URI.t,
+         credential: credential,
+         varbinds: [req_varbind, ...],
+       }
+
+  @type req_options :: Keyword.t
+
+  @type request_result
+    :: {:ok, varbind}
+     | {:error, any}
+
+  @spec request(req_params, req_options)
+    :: [request_result, ...]
+  def request(
+    %{uri: %{scheme: _, host: _, port: _} = uri,
+      credential: credential,
+      varbinds: varbinds,
+    },
+    options \\ []
+  )   when is_list(varbinds)
+       and is_list(options)
   do
-    perform_snmp_op(
-      :get,
-      objects,
-      agent,
-      credential,
-      options
-    )
-  end
+    op =
+      cond do
+        Enum.all?(varbinds, & &1[:oid] && &1[:value]) ->
+          :set
 
-  def get(object, agent, credential, options),
-    do: get([object], agent, credential, options)
+        Enum.all?(
+          varbinds,
+          & &1.oid && (&1[:type] == :next)
+        ) ->
+          :get_next
 
-  def set(
-        objects,
-        agent,
+        Enum.all?(varbinds, & &1[:oid]) ->
+          :get
+      end
+
+    with {:ok, ip_uri} <- resolve_host_in_uri(uri) do
+      perform_snmp_op(
+        op,
+        varbinds,
+        ip_uri,
         credential,
-        value,
-        value_type,
-        options \\ []
-      )
-
-  def set(
-        [h | _] = objects,
-        agent,
-        credential,
-        value,
-        value_type,
         options
       )
-      when is_list(h) or
-             is_binary(h) do
-    perform_snmp_op(
-      :set,
-      objects,
-      agent,
-      credential,
-      value,
-      value_type,
-      options
-    )
+    end
   end
 
-  def set(
-        object,
-        agent,
-        credential,
-        value,
-        value_type,
-        options
-      ) do
-    set(
-      [object],
-      agent,
-      credential,
-      value,
-      value_type,
-      options
-    )
-  end
+  def walk(object, uri, credential, options \\ [])
 
-  def get_next(objects, agent, credential, options \\ [])
-
-  def get_next(
-    [h | _] = objects,
-    agent,
-    credential,
-    options
-  ) when is_list(h)
-      or is_binary(h)
-  do
-    perform_snmp_op(
-      :get_next,
-      objects,
-      agent,
-      credential,
-      options
-    )
-  end
-
-  def get_next(object, agent, credential, options),
-    do: get_next([object], agent, credential, options)
-
-  def walk(object, agent, credential, options \\ [])
-
-  def walk(object, agent, credential, options) do
+  def walk(object, uri, credential, options) do
     [base_oid] = normalize_to_oids([object])
 
     {base_oid ++ [0], nil, nil}
     |> Stream.iterate(fn last_result ->
       {last_oid, _, _} = last_result
 
-      last_oid
-      |> get_next(agent, credential, options)
+      %{uri: uri,
+        credential: credential,
+        varbinds: [%{oid: last_oid, type: :next}]
+      }
+      |> request(options)
       |> List.first()
     end)
     |> Stream.take_while(fn {oid, _, _} ->
@@ -929,305 +777,132 @@ defmodule SNMP do
   end
 
   @doc """
-  Returns a keyword list containing the given SNMPv1/2c/3
+  Returns a keyword list containing the given SNMP
   credentials.
 
   ## Example
 
-      iex> SNMP.credential([:v1, "public"])
-      %SNMP.CommunityCredential{version: :v1, sec_model: :v1, community: 'public'}
+      iex> SNMP.credential(%{community: "public"})
+      %SNMP.CommunityCredential{community: 'public'}
 
-      iex> SNMP.credential([:v2c, "public"])
-      %SNMP.CommunityCredential{version: :v2, sec_model: :v2c, community: 'public'}
+      iex> SNMP.credential(
+      ...>   %{version: :v2, community: "public"}
+      ...> )
+      %SNMP.CommunityCredential{
+        version: :v2,
+        sec_model: :v2c,
+        community: 'public',
+      }
 
-      iex> SNMP.credential([:v3, :no_auth_no_priv, "user"])
-      %SNMP.USMCredential{sec_level: :noAuthNoPriv, sec_name:  'user'}
+      iex> SNMP.credential(%{sec_name: "user"})
+      %SNMP.USMCredential{sec_name: 'user'}
 
-      iex> SNMP.credential([:v3, :auth_no_priv, "user", :md5, "authpass"])
+      iex> SNMP.credential(
+      ...>   %{sec_name: "user",
+      ...>     auth: :sha,
+      ...>     auth_pass: "authpass",
+      ...>   }
+      ...> )
       %SNMP.USMCredential{
+        sec_name: 'user',
         sec_level: :authNoPriv,
-        sec_name:  'user',
-        auth:      :md5,
+        auth: :usmHMACSHAAuthProtocol,
         auth_pass: 'authpass',
       }
 
-      iex> SNMP.credential([:v3, :auth_no_priv, "user", :sha, "authpass"])
+      iex> SNMP.credential(
+      ...>   %{sec_name: "user",
+      ...>     auth: :sha,
+      ...>     auth_pass: "authpass",
+      ...>     priv: :aes,
+      ...>     priv_pass: "privpass",
+      ...>   }
+      ...> )
       %SNMP.USMCredential{
-        sec_level: :authNoPriv,
-        sec_name:  'user',
-        auth:      :sha,
-        auth_pass: 'authpass',
-      }
-
-      iex> SNMP.credential([:v3, :auth_priv, "user", :md5, "authpass", :des, "privpass"])
-      %SNMP.USMCredential{
+        sec_name: 'user',
         sec_level: :authPriv,
-        sec_name:  'user',
-        auth:      :md5,
+        auth: :usmHMACSHAAuthProtocol,
         auth_pass: 'authpass',
-        priv:      :des,
+        priv: :usmAesCfb128Protocol,
         priv_pass: 'privpass',
       }
-
-      iex> SNMP.credential([:v3, :auth_priv, "user", :sha, "authpass", :des, "privpass"])
-      %SNMP.USMCredential{
-        sec_level: :authPriv,
-        sec_name:  'user',
-        auth:      :sha,
-        auth_pass: 'authpass',
-        priv:      :des,
-        priv_pass: 'privpass',
-      }
-
-      iex> SNMP.credential([:v3, :auth_priv, "user", :md5, "authpass", :aes, "privpass"])
-      %SNMP.USMCredential{
-        sec_level: :authPriv,
-        sec_name:  'user',
-        auth:      :md5,
-        auth_pass: 'authpass',
-        priv:      :aes,
-        priv_pass: 'privpass',
-      }
-
-      iex> SNMP.credential([:v3, :auth_priv, "user", :sha, "authpass", :aes, "privpass"])
-      %SNMP.USMCredential{
-        sec_level: :authPriv,
-        sec_name:  'user',
-        auth:      :sha,
-        auth_pass: 'authpass',
-        priv:      :aes,
-        priv_pass: 'privpass',
-      }
-
   """
-  @spec credential([atom | String.t()])
-    :: snmp_credential
-     | no_return
-  def credential(args) when is_list(args) do
-    case args do
-      [:v1, _] ->
-        apply(&credential/2, args)
-
-      [:v2c, _] ->
-        apply(&credential/2, args)
-
-      [:v3, :no_auth_no_priv, _] ->
-        apply(&credential/3, args)
-
-      [:v3, :auth_no_priv, _, _, _] ->
-        apply(&credential/5, args)
-
-      [:v3, :auth_priv, _, _, _, _, _] ->
-        apply(&credential/7, args)
-    end
-  end
-
-  @doc """
-  Returns a keyword list containing the given SNMPv1/2c
-  community.
-
-  ## Example
-
-      iex> SNMP.credential(:v1, "public")
-      %SNMP.CommunityCredential{version: :v1, sec_model: :v1, community: 'public'}
-
-      iex> SNMP.credential(:v2c, "public")
-      %SNMP.CommunityCredential{version: :v2, sec_model: :v2c, community: 'public'}
-
-  """
-  @spec credential(:v1 | :v2c, String.t())
-    :: snmp_credential
-     | no_return
-  def credential(version, community)
-
-  def credential(:v1, community) do
-    %CommunityCredential{
-      version:   :v1,
-      sec_model: :v1,
-      community: :binary.bin_to_list(community)
+  def credential(
+    %{version: :v2,
+      community: community,
     }
-  end
-
-  def credential(:v2c, community) do
+  )   when is_binary(community)
+  do
     %CommunityCredential{
-      version:   :v2,
+      version: :v2,
       sec_model: :v2c,
-      community: :binary.bin_to_list(community)
+      community: :binary.bin_to_list(community),
     }
   end
 
-  @doc """
-  Returns a keyword list containing the given SNMPv3
-  noAuthNoPriv credentials.
-
-  ## Example
-
-      iex> SNMP.credential(:v3, :no_auth_no_priv, "user")
-      %SNMP.USMCredential{sec_level: :noAuthNoPriv, sec_name: 'user'}
-
-  """
-  @spec credential(:v3, :no_auth_no_priv, String.t())
-    :: snmp_credential
-     | no_return
-  def credential(version, sec_level, sec_name)
-
-  def credential(:v3, :no_auth_no_priv, sec_name),
-    do: %USMCredential{
-      sec_level: :noAuthNoPriv,
-      sec_name:  :binary.bin_to_list(sec_name)
+  def credential(%{community: community})
+      when is_binary(community)
+  do
+    %CommunityCredential{
+      version: :v1,
+      sec_model: :v1,
+      community: :binary.bin_to_list(community),
     }
-
-  @doc """
-  Returns a keyword list containing the given SNMPv3
-  authNoPriv credentials.
-
-  ## Example
-
-      iex> SNMP.credential(:v3, :auth_no_priv, "user", :md5, "authpass")
-      %SNMP.USMCredential{
-        sec_level: :authNoPriv,
-        sec_name:  'user',
-        auth:      :md5,
-        auth_pass: 'authpass',
-      }
-
-      iex> SNMP.credential(:v3, :auth_no_priv, "user", :sha, "authpass")
-      %SNMP.USMCredential{
-        sec_level: :authNoPriv,
-        sec_name:  'user',
-        auth:      :sha,
-        auth_pass: 'authpass',
-      }
-
-  """
-  @spec credential(
-    :v3,
-    :auth_no_priv,
-    String.t(),
-    :md5 | :sha,
-    String.t()
-  ) :: snmp_credential
-     | no_return
-  def credential(
-    version,
-    sec_level,
-    sec_name,
-    auth_proto,
-    auth_pass
-  )
+  end
 
   def credential(
-    :v3,
-    :auth_no_priv,
-    sec_name,
-    auth_proto,
-    auth_pass
-  ) when auth_proto in [:md5, :sha]
+    %{sec_name: sec_name,
+      auth: auth,
+      auth_pass: auth_pass,
+      priv: priv,
+      priv_pass: priv_pass,
+    }
+  )   when is_binary(sec_name)
+       and auth in [:md5, :sha]
+       and is_binary(auth_pass)
+       and priv in [:des, :aes]
+       and is_binary(priv_pass)
+  do
+    %USMCredential{
+      sec_level: :authPriv,
+      sec_name: :binary.bin_to_list(sec_name),
+      auth: auth_proto_to_snmpm_auth(auth),
+      auth_pass: :binary.bin_to_list(auth_pass),
+      priv: priv_proto_to_snmpm_priv(priv),
+      priv_pass: :binary.bin_to_list(priv_pass),
+    }
+  end
+
+  def credential(
+    %{sec_name: sec_name,
+      auth: auth,
+      auth_pass: auth_pass,
+    }
+  )   when is_binary(sec_name)
+       and auth in [:md5, :sha]
+       and is_binary(auth_pass)
   do
     %USMCredential{
       sec_level: :authNoPriv,
-      sec_name:  :binary.bin_to_list(sec_name),
-      auth:      auth_proto,
-      auth_pass: :binary.bin_to_list(auth_pass)
+      sec_name: :binary.bin_to_list(sec_name),
+      auth: auth_proto_to_snmpm_auth(auth),
+      auth_pass: :binary.bin_to_list(auth_pass),
+    }
+  end
+
+  def credential(%{sec_name: sec_name})
+      when is_binary(sec_name)
+  do
+    %USMCredential{
+      sec_name: :binary.bin_to_list(sec_name),
     }
   end
 
   defp auth_proto_to_snmpm_auth(:md5), do: :usmHMACMD5AuthProtocol
   defp auth_proto_to_snmpm_auth(:sha), do: :usmHMACSHAAuthProtocol
-  defp auth_proto_to_snmpm_auth(_),    do: :usmNoAuthProtocol
-  defp priv_proto_to_snmpm_auth(:des), do: :usmDESPrivProtocol
-  defp priv_proto_to_snmpm_auth(:aes), do: :usmAesCfb128Protocol
-  defp priv_proto_to_snmpm_auth(_),    do: :usmNoPrivProtocol
 
-  @doc """
-  Returns `t:snmp_credential/0` containing the given SNMPv3
-  authPriv credentials.
-
-  ## Examples
-
-      iex> SNMP.credential(:v3, :auth_priv, "user", :md5, "authpass", :des, "privpass")
-      %SNMP.USMCredential{
-        sec_level: :authPriv,
-        sec_name:  'user',
-        auth:      :md5,
-        auth_pass: 'authpass',
-        priv:      :des,
-        priv_pass: 'privpass',
-      }
-
-      iex> SNMP.credential(:v3, :auth_priv, "user", :sha, "authpass", :des, "privpass")
-      %SNMP.USMCredential{
-        sec_level: :authPriv,
-        sec_name:  'user',
-        auth:      :sha,
-        auth_pass: 'authpass',
-        priv:      :des,
-        priv_pass: 'privpass',
-      }
-
-      iex> SNMP.credential(:v3, :auth_priv, "user", :md5, "authpass", :aes, "privpass")
-      %SNMP.USMCredential{
-        sec_level: :authPriv,
-        sec_name:  'user',
-        auth:      :md5,
-        auth_pass: 'authpass',
-        priv:      :aes,
-        priv_pass: 'privpass',
-      }
-
-      iex> SNMP.credential(:v3, :auth_priv, "user", :sha, "authpass", :aes, "privpass")
-      %SNMP.USMCredential{
-        sec_level: :authPriv,
-        sec_name:  'user',
-        auth:      :sha,
-        auth_pass: 'authpass',
-        priv:      :aes,
-        priv_pass: 'privpass',
-      }
-
-  """
-  @spec credential(
-    :v3,
-    :auth_priv,
-    String.t(),
-    :md5 | :sha,
-    String.t(),
-    :des | :aes,
-    String.t()
-  ) :: snmp_credential
-     | no_return
-  def credential(
-    version,
-    sec_level,
-    sec_name,
-    auth_proto,
-    auth_pass,
-    priv_proto,
-    priv_pass
-  )
-
-  def credential(
-    :v3,
-    :auth_priv,
-    sec_name,
-    auth_proto,
-    auth_pass,
-    priv_proto,
-    priv_pass
-  )   when auth_proto in [:md5, :sha]
-       and priv_proto in [:des, :aes]
-  do
-    # http://erlang.org/doc/man/snmpm.html#register_usm_user-3
-
-    %USMCredential{
-      sec_level: :authPriv,
-      sec_name:  :binary.bin_to_list(sec_name),
-      auth:      auth_proto,
-      auth_pass: :binary.bin_to_list(auth_pass),
-      priv:      priv_proto,
-      priv_pass: :binary.bin_to_list(priv_pass)
-    }
-  end
+  defp priv_proto_to_snmpm_priv(:des), do: :usmDESPrivProtocol
+  defp priv_proto_to_snmpm_priv(:aes), do: :usmAesCfb128Protocol
 
   @doc """
   Converts `oid` to dot-delimited string.

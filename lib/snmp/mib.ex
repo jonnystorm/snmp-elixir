@@ -110,7 +110,7 @@ defmodule SNMP.MIB do
         Application.get_env(
           :snmp_ex,
           :snmpc_verbosity,
-          "silence"
+          :silence
         ),
       group_check: false,
       i: erl_include_paths,
