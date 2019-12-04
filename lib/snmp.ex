@@ -411,10 +411,12 @@ defmodule SNMP do
         varbinds
         |> Enum.sort_by(sort_fun)
         |> Enum.map(fn {_, oid, type, value, _} ->
-          %{oid: oid,
-            type: type,
-            value: :binary.list_to_bin(value),
-          }
+          v =
+            with v when is_list(v) <- value do
+              :binary.list_to_bin(v)
+            end
+
+          %{oid: oid, type: type, value: v}
         end)
 
       {:error, {:invalid_oid, {:error, :not_found}}} ->
