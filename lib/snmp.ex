@@ -400,6 +400,18 @@ defmodule SNMP do
     end
   end
 
+  defp groom_erl_varbind(
+    %{type: t, value: v} = varbind
+  ) do
+    new_v =
+      case t do
+        :"OCTET STRING" -> :binary.list_to_bin(v)
+        _               -> v
+      end
+
+    %{varbind|value: new_v}
+  end
+
   defp groom_snmp_result(result) do
     sort_fun =
       fn {_, _, _, _, original_index} ->
@@ -407,17 +419,27 @@ defmodule SNMP do
       end
 
     case result do
-      {:ok, {:noError, 0, varbinds}, _} ->
-        varbinds
-        |> Enum.sort_by(sort_fun)
-        |> Enum.map(fn {_, oid, type, value, _} ->
-          v =
-            with v when is_list(v) <- value do
-              :binary.list_to_bin(v)
-            end
+      {:ok, {reply, err_index, varbinds}, _} ->
+        if {reply, err_index} == {:noError, 0} do
+          result =
+            varbinds
+            |> Enum.sort_by(sort_fun)
+            |> Enum.map(fn {_, oid, type, value, _} ->
+              %{oid: oid, type: type, value: value}
+              |> groom_erl_varbind
+            end)
 
-          %{oid: oid, type: type, value: v}
-        end)
+          {:ok, result}
+        else
+          {_, oid, type, value, _} =
+            Enum.at(varbinds, err_index - 1)
+
+          varbind =
+            %{oid: oid, type: type, value: value}
+            |> groom_erl_varbind
+
+          {:error, {reply, varbind}}
+        end
 
       {:error, {:invalid_oid, {:error, :not_found}}} ->
         :ok = Logger.error("Unknown OID")
@@ -567,7 +589,14 @@ defmodule SNMP do
 
       :set ->
         vars_and_vals =
-          Enum.map(varbinds, & {&1.oid, &1.value})
+          varbinds
+          |> Enum.map(fn v ->
+            if Map.has_key?(v, :type) do
+              {v.oid, v.type, v.value}
+            else
+              {v.oid, v.value}
+            end
+          end)
 
         :snmpm.sync_set(
           __MODULE__,
@@ -671,11 +700,11 @@ defmodule SNMP do
   @type req_options :: Keyword.t
 
   @type request_result
-    :: {:ok, varbind}
+    :: {:ok, [varbind, ...]}
      | {:error, any}
 
   @spec request(req_params, req_options)
-    :: [request_result, ...]
+    :: request_result
   def request(
     %{uri: %{scheme: _, host: _, port: _} = uri,
       credential: credential,
@@ -685,22 +714,31 @@ defmodule SNMP do
   )   when is_list(varbinds)
        and is_list(options)
   do
-    op =
-      cond do
-        Enum.all?(varbinds, & &1[:oid] && &1[:value]) ->
-          :set
+    with op when not is_nil(op) <-
+           ( cond do
+               Enum.all?(
+                 varbinds,
+                 & &1[:oid] && &1[:value]
+               ) ->
+                 :set
 
-        Enum.all?(
-          varbinds,
-          & &1.oid && (&1[:type] == :next)
-        ) ->
-          :get_next
+               Enum.all?(
+                 varbinds,
+                 & &1[:oid] && (&1[:type] == :next)
+               ) ->
+                 :get_next
 
-        Enum.all?(varbinds, & &1[:oid]) ->
-          :get
-      end
+               Enum.all?(varbinds, & &1[:oid]) ->
+                 :get
 
-    with {:ok, ip_uri} <- resolve_host_in_uri(uri) do
+               true ->
+                 :ok = Logger.error("Request contains unacceptable varbinds: #{inspect(varbinds)}")
+
+                 {:error, :einval}
+             end
+           ),
+         {:ok, ip_uri} <- resolve_host_in_uri(uri)
+    do
       perform_snmp_op(
         op,
         varbinds,
@@ -711,23 +749,27 @@ defmodule SNMP do
     end
   end
 
-  def walk(object, uri, credential, options \\ [])
-
-  def walk(object, uri, credential, options) do
+  #@spec walk(req_params, req_options)
+  def walk(
+    %{uri: uri,
+      credential: credential,
+      varbinds: [%{oid: object}|_],
+    },
+    options \\ []
+  ) do
     [base_oid] = normalize_to_oids([object])
 
-    {base_oid ++ [0], nil, nil}
-    |> Stream.iterate(fn last_result ->
-      {last_oid, _, _} = last_result
-
+    %{oid: base_oid ++ [0]}
+    |> Stream.iterate(fn %{oid: last_oid} ->
       %{uri: uri,
         credential: credential,
         varbinds: [%{oid: last_oid, type: :next}]
       }
       |> request(options)
-      |> List.first()
+      |> elem(1)
+      |> List.first
     end)
-    |> Stream.take_while(fn {oid, _, _} ->
+    |> Stream.take_while(fn %{oid: oid} ->
       List.starts_with?(oid, base_oid)
     end)
     |> Stream.drop(1)
