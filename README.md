@@ -36,12 +36,13 @@ iex> %{uri: URI.parse("snmp://an-snmp-host.local"),
 ...>   credential: v2_cred,
 ...>   varbinds: [%{oid: base_oid ++ [0]}],
 ...> } |> SNMP.request
-[
-  %{oid: [1, 3, 6, 1, 2, 1, 1, 5, 0],
-    type: :"OCTET STRING",
-    value: "an-snmp-host"
-  }
-]
+{ :ok,
+  [ %{oid: [1, 3, 6, 1, 2, 1, 1, 5, 0],
+      type: :"OCTET STRING",
+      value: "an-snmp-host"
+    }
+  ]
+}
 iex>
 iex> v3_cred =
 ...>   SNMP.credential(
@@ -65,8 +66,7 @@ iex> v3_cred =
 }
 iex> SNMP.walk("ipAddrTable", "an-snmp-host.local", v3_cred)
 ...> |> Enum.take(1)
-[
-  %{oid: [1, 3, 6, 1, 2, 1, 4, 20, 1, 1, 192, 0, 2, 1],
+[ %{oid: [1, 3, 6, 1, 2, 1, 4, 20, 1, 1, 192, 0, 2, 1],
     type: :IpAddress,
     value: [192, 0, 2, 1],
   }
