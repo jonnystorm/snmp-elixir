@@ -11,11 +11,11 @@ defmodule SNMP.Test do
   @sysname_result %{
     oid: @sysname_oid,
     type: :"OCTET STRING",
-    value: "new sys name"
+    value: "test-52567"
   }
 
   # Presumably working agent, but has frequent troubles
-  @working_agent "demo.snmplabs.com"
+  @working_agent "demo.snmplabs.com:1161"
 
   # Optimistically, should be a broken agent
   @borking_agent "localhost:65535"
@@ -50,7 +50,7 @@ defmodule SNMP.Test do
     get_sysname(
       credential,
       agent,
-      engine_id: <<0x80004FB805636C6F75644DAB22CC::14*8>>
+      engine_id: <<0x80004fb805636c6f75644dab22cd::14*8>>
     )
   end
 
@@ -80,7 +80,7 @@ defmodule SNMP.Test do
         |> get_credential(:none)
         |> get_sysname_with_engine_id(@working_agent)
 
-      assert result == [@sysname_result]
+      assert result == {:ok, [@sysname_result]}
     end
 
     test "timeout without engine discovery" do
@@ -98,7 +98,7 @@ defmodule SNMP.Test do
         |> get_credential(:none)
         |> get_sysname(@working_agent)
 
-      assert result == [@sysname_result]
+      assert result == {:ok, [@sysname_result]}
     end
 
     test "timeout with engine discovery" do
@@ -119,7 +119,7 @@ defmodule SNMP.Test do
           |> get_credential(:none)
           |> get_sysname_with_engine_id(@working_agent)
 
-        assert result == [@sysname_result]
+        assert result == {:ok, [@sysname_result]}
       end
     end
 
@@ -141,7 +141,7 @@ defmodule SNMP.Test do
           |> get_credential(:none)
           |> get_sysname(@working_agent)
 
-        assert result == [@sysname_result]
+        assert result == {:ok, [@sysname_result]}
       end
     end
 
@@ -167,7 +167,7 @@ defmodule SNMP.Test do
           |> get_credential(priv)
           |> get_sysname_with_engine_id(@working_agent)
 
-        assert result == [@sysname_result]
+        assert result == {:ok, [@sysname_result]}
       end
     end
 
@@ -193,7 +193,7 @@ defmodule SNMP.Test do
           |> get_credential(priv)
           |> get_sysname(@working_agent)
 
-        assert result == [@sysname_result]
+        assert result == {:ok, [@sysname_result]}
       end
     end
 
@@ -213,115 +213,65 @@ defmodule SNMP.Test do
 
   describe "v1" do
     test "set" do
-      uri  = URI.parse("snmp://#{@working_agent}")
-      cred = SNMP.credential(%{community: "public"})
-
-      before_set =
-        %{uri: uri,
-          credential: cred,
+      req =
+        %{uri: URI.parse("snmp://#{@working_agent}"),
+          credential: SNMP.credential(%{community: "public"}),
           varbinds: [%{oid: @sysname_oid}],
         }
-        |> SNMP.request
 
-      refute before_set ==
-        [ { :ok,
-            %{oid: @sysname_oid,
-              type: :"OCTET STRING",
-              value: 'test',
-            }
-          }
-        ]
+      {:ok, [%{value: v}]} = before = SNMP.request(req)
 
-      set_result =
-        %{uri: uri,
-          credential: cred,
-          varbinds: [%{oid: @sysname_oid, value: "test"}],
-        }
-        |> SNMP.request
+      {_, _, us} = :erlang.now
 
-      assert set_result ==
-        [ { :ok,
-            %{oid: @sysname_oid,
-              type: :"OCTET STRING",
-              value: 'test',
-            }
-          }
-        ]
+      new_v = "test-#{us}"
 
-      after_set =
-        %{uri: uri,
-          credential: cred,
-          varbinds: [%{oid: @sysname_oid}],
-        }
-        |> SNMP.request
+      %{req |
+        varbinds: [
+          %{oid: @sysname_oid, type: :s, value: new_v}
+        ],
+      }
+      |> SNMP.request
 
-      assert after_set ==
-        [ { :ok,
-            %{oid: @sysname_oid,
-              type: :"OCTET STRING",
-              value: 'test',
-            }
-          }
-        ]
+      refute before == SNMP.request(req)
+
+      %{req |
+        varbinds: [
+          %{oid: @sysname_oid, type: :s, value: v}
+        ],
+      }
+      |> SNMP.request
     end
   end
 
   describe "v2" do
     test "set" do
-      uri  = URI.parse("snmp://#{@working_agent}")
-      cred =
-        %{version: :v2,
-          community: "public",
-        }
-        |> SNMP.credential
-
-      before_set =
-        %{uri: uri,
-          credential: cred,
+      req =
+        %{uri: URI.parse("snmp://#{@working_agent}"),
+          credential: SNMP.credential(
+            %{version: :v2, community: "public"}
+          ),
           varbinds: [%{oid: @sysname_oid}],
         }
-        |> SNMP.request
 
-      refute before_set ==
-        [ { :ok,
-            %{oid: @sysname_oid,
-              type: :"OCTET STRING",
-              value: "test",
-            }
-          }
-        ]
+      {:ok, [%{value: v}]} = before = SNMP.request(req)
 
-      set_result =
-        %{uri: uri,
-          credential: cred,
-          varbinds: [%{oid: @sysname_oid, value: "test"}],
-        }
-        |> SNMP.request
+      {_, _, us} = :erlang.now
 
-      assert set_result ==
-        [ { :ok,
-            %{oid: @sysname_oid,
-              type: :"OCTET STRING",
-              value: 'test',
-            }
-          }
-        ]
+      new_v = "test-#{us}"
 
-      after_set =
-        %{uri: uri,
-          credential: cred,
-          varbinds: [%{oid: @sysname_oid}],
-        }
-        |> SNMP.request
+      %{req |
+        varbinds: [%{oid: @sysname_oid, value: new_v}],
+      }
+      |> SNMP.request
 
-      assert after_set ==
-        [ { :ok,
-            %{oid: @sysname_oid,
-              type: :"OCTET STRING",
-              value: "test",
-            }
-          }
-        ]
+      refute before == SNMP.request(req)
+
+      %{req |
+        varbinds: [
+          %{oid: @sysname_oid, type: :s, value: v}
+        ],
+      }
+      |> SNMP.request
     end
   end
 end
