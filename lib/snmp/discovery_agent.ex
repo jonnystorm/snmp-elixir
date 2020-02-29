@@ -1,8 +1,7 @@
 defmodule SNMP.DiscoveryAgent do
-  @moduledoc """
-  Provides abstractions to SNMP engine discovery through
-  snmp agent
-  """
+  # Provides abstractions to SNMP engine discovery through
+  # snmp agent
+  @moduledoc false
 
   use GenServer
   require Logger
