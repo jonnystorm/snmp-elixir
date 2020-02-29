@@ -1,6 +1,6 @@
 defmodule SNMP.Test do
   use ExUnit.Case, async: false
-  doctest SNMP
+  doctest SNMP, except: [request: 2, walk: 2]
 
   # For a full explanation of magic values, please see
   # http://snmplabs.com/snmpsim/public-snmp-agent-simulator.html

@@ -64,7 +64,10 @@ iex> v3_cred =
   sec_name: 'nms',
   version: :v3
 }
-iex> SNMP.walk("ipAddrTable", "an-snmp-host.local", v3_cred)
+iex> %{uri: URI.parse("snmp://an-snmp-host.local"),
+...>   credential: v3_cred,
+...>   varbinds: [%{oid: "ipAddrTable"}],
+...> } |> SNMP.walk
 ...> |> Enum.take(1)
 [ %{oid: [1, 3, 6, 1, 2, 1, 4, 20, 1, 1, 192, 0, 2, 1],
     type: :IpAddress,

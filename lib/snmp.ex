@@ -674,7 +674,9 @@ defmodule SNMP do
     |> :binary.bin_to_list()
   end
 
-  @type object_name :: binary
+  @type object_name
+    :: binary
+     | atom
 
   @type object_id
     :: object_name
@@ -707,6 +709,40 @@ defmodule SNMP do
     :: {:ok, [varbind, ...]}
      | {:error, any}
 
+  @doc """
+  Perform an SNMP GET/SET request.
+
+  ## Example
+
+      iex> %{uri: URI.parse("snmp://an-snmp-host.local"),
+      ...>   credential: v2_cred,
+      ...>   varbinds: [%{oid: [1,3,6,1,2,1,1,5,0]}],
+      ...> } |> SNMP.request
+      { :ok,
+        [ %{oid: [1, 3, 6, 1, 2, 1, 1, 5, 0],
+            type: :"OCTET STRING",
+            value: "an-snmp-host"
+          }
+        ]
+      }
+
+      iex> %{uri: URI.parse("snmp://an-snmp-host.local"),
+      ...>   credential: v2_cred,
+      ...>   varbinds: [
+      ...>     %{oid: [1,3,6,1,2,1,1,5,0],
+      ...>       type: :s,
+      ...>       value: "new-hostname",
+      ...>     },
+      ...>   ],
+      ...> } |> SNMP.request
+      { :ok,
+        [ %{oid: [1, 3, 6, 1, 2, 1, 1, 5, 0],
+            type: :"OCTET STRING",
+            value: "new-hostname"
+          }
+        ]
+      }
+  """
   @spec request(req_params, req_options)
     :: request_result
   def request(
@@ -753,7 +789,27 @@ defmodule SNMP do
     end
   end
 
-  #@spec walk(req_params, req_options)
+  @doc """
+  Perform an SNMP walk using GETNEXT operations.
+
+  This function returns a stream, which ensures that the
+  resulting walk is bounded.
+
+  ## Example
+
+      iex> %{uri: URI.parse("snmp://an-snmp-host.local"),
+      ...>   credential: v3_cred,
+      ...>   varbinds: [%{oid: "ipAddrTable"}],
+      ...> } |> SNMP.walk
+      ...> |> Enum.take(1)
+      [ %{oid: [1, 3, 6, 1, 2, 1, 4, 20, 1, 1, 192, 0, 2, 1],
+          type: :IpAddress,
+          value: [192, 0, 2, 1],
+        }
+      ]
+  """
+  @spec walk(req_params, req_options)
+    :: Enumerable.t
   def walk(
     %{uri: uri,
       credential: credential,
@@ -784,7 +840,9 @@ defmodule SNMP do
   @spec load_mib(mib_name)
     :: :ok
      | {:error, term}
-  def load_mib(mib_name) do
+  def load_mib(mib_name)
+      when is_binary(mib_name)
+  do
     erl_mib_name = :binary.bin_to_list(mib_name)
 
     case :snmpm.load_mib(erl_mib_name) do
@@ -798,17 +856,10 @@ defmodule SNMP do
     end
   end
 
-  @spec load_mib!(mib_name)
-    :: :ok
+  @spec resolve_object_name_to_oid(object_id)
+    :: {:ok, object_id}
+     | {:error, term}
      | no_return
-  def load_mib!(mib_name) when is_binary(mib_name) do
-    if load_mib(mib_name) == :ok do
-      :ok
-    else
-      raise "Unable to load mib #{inspect(mib_name)}"
-    end
-  end
-
   def resolve_object_name_to_oid(oid)
       when is_list(oid),
     do: oid
@@ -967,7 +1018,8 @@ defmodule SNMP do
   @spec list_oid_to_string([non_neg_integer])
     :: String.t()
      | no_return
-  def list_oid_to_string(oid) when is_list(oid),
+  def list_oid_to_string(oid)
+      when is_list(oid),
     do: Enum.join(oid, ".")
 
   @doc """
@@ -982,7 +1034,9 @@ defmodule SNMP do
   @spec string_oid_to_list(String.t())
     :: [non_neg_integer]
      | no_return
-  def string_oid_to_list(oid) when is_binary(oid) do
+  def string_oid_to_list(oid)
+      when is_binary(oid)
+  do
     oid
     |> String.split(".", trim: true)
     |> Enum.map(&String.to_integer/1)
