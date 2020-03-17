@@ -129,7 +129,7 @@ Better](http://hintjens.com/blog:106).
 
 ## TODO
 
-* ~~SNMPv3 USM~~ (AES requires patched OTP; see issue #6)
+* ~~SNMPv3 USM~~ (AES support requires OTP >=23; see corresponding [pull request](https://github.com/erlang/otp/pull/2544) for details.)
 * ~~USM engine discovery~~
 * SNMP tables
 * ~~MIB name resolution~~
