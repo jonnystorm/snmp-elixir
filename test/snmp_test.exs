@@ -14,11 +14,23 @@ defmodule SNMP.Test do
     value: "test-52567"
   }
 
-  # Presumably working agent, but has frequent troubles
-  @working_agent "demo.snmplabs.com:1161"
+  # docker pull davaeron/snmpsim
+  # docker run -d -p 161:161/udp davaeron/snmpsim
+  # required for integration tests
+  @working_agent "localhost"
 
   # Optimistically, should be a broken agent
   @borking_agent "localhost:65535"
+
+  # Check if we are using CI
+  # if we are in CI, we use container alias for hostname
+  defp get_working_agent() do
+    if System.get_env("CI_SERVER") == "yes" do
+      "snmpsim"
+    else
+      @working_agent
+    end
+  end
 
   defp get_credential(:none, :none),
     do: SNMP.credential(%{sec_name: "usr-none-none"})
@@ -35,7 +47,7 @@ defmodule SNMP.Test do
 
   defp get_credential(auth, priv)
       when auth in [:md5, :sha]
-       and priv in [:des, :aes]
+       and priv in [:des]
   do
     %{sec_name: "usr-#{auth}-#{priv}",
       auth: auth,
@@ -78,7 +90,7 @@ defmodule SNMP.Test do
       result =
         :none
         |> get_credential(:none)
-        |> get_sysname_with_engine_id(@working_agent)
+        |> get_sysname_with_engine_id(get_working_agent())
 
       assert result == {:ok, [@sysname_result]}
     end
@@ -96,7 +108,7 @@ defmodule SNMP.Test do
       result =
         :none
         |> get_credential(:none)
-        |> get_sysname(@working_agent)
+        |> get_sysname(get_working_agent())
 
       assert result == {:ok, [@sysname_result]}
     end
@@ -117,7 +129,7 @@ defmodule SNMP.Test do
         result =
           auth
           |> get_credential(:none)
-          |> get_sysname_with_engine_id(@working_agent)
+          |> get_sysname_with_engine_id(get_working_agent())
 
         assert result == {:ok, [@sysname_result]}
       end
@@ -139,7 +151,7 @@ defmodule SNMP.Test do
         result =
           auth
           |> get_credential(:none)
-          |> get_sysname(@working_agent)
+          |> get_sysname(get_working_agent())
 
         assert result == {:ok, [@sysname_result]}
       end
@@ -160,12 +172,12 @@ defmodule SNMP.Test do
   describe "v3 get authPriv" do
     test "get without engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
+          priv <- [:des]
       do
         result =
           auth
           |> get_credential(priv)
-          |> get_sysname_with_engine_id(@working_agent)
+          |> get_sysname_with_engine_id(get_working_agent())
 
         assert result == {:ok, [@sysname_result]}
       end
@@ -173,7 +185,7 @@ defmodule SNMP.Test do
 
     test "timeout without engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
+          priv <- [:des]
       do
         result =
           auth
@@ -186,12 +198,12 @@ defmodule SNMP.Test do
 
     test "get with engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
+          priv <- [:des]
       do
         result =
           auth
           |> get_credential(priv)
-          |> get_sysname(@working_agent)
+          |> get_sysname(get_working_agent())
 
         assert result == {:ok, [@sysname_result]}
       end
@@ -199,7 +211,7 @@ defmodule SNMP.Test do
 
     test "timeout with engine discovery" do
       for auth <- [:md5, :sha],
-          priv <- [:des, :aes]
+          priv <- [:des]
       do
         result =
           auth
@@ -214,7 +226,7 @@ defmodule SNMP.Test do
   describe "v1" do
     test "set" do
       req =
-        %{uri: URI.parse("snmp://#{@working_agent}"),
+        %{uri: URI.parse("snmp://#{get_working_agent()}"),
           credential: SNMP.credential(%{community: "public"}),
           varbinds: [%{oid: @sysname_oid}],
         }
@@ -246,7 +258,7 @@ defmodule SNMP.Test do
   describe "v2" do
     test "set" do
       req =
-        %{uri: URI.parse("snmp://#{@working_agent}"),
+        %{uri: URI.parse("snmp://#{get_working_agent()}"),
           credential: SNMP.credential(
             %{version: :v2, community: "public"}
           ),
@@ -260,7 +272,7 @@ defmodule SNMP.Test do
       new_v = "test-#{us}"
 
       %{req |
-        varbinds: [%{oid: @sysname_oid, value: new_v}],
+        varbinds: [%{oid: @sysname_oid, type: :s, value: new_v}],
       }
       |> SNMP.request
 
