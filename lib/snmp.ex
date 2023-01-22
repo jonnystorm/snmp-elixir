@@ -511,7 +511,7 @@ defmodule SNMP do
       # warm-up to update the engineBoots and engineTime in
       # SNMPM
 
-      :snmpm.sync_get(__MODULE__, target_name, [], 2000)
+      sync_get(target_name, [], 2000)
     end
 
     :ok
@@ -569,12 +569,11 @@ defmodule SNMP do
           |> Enum.map(& &1.oid)
           |> normalize_to_oids
 
-        :snmpm.sync_get(
-          __MODULE__,
+        sync_get(
           target,
-          context,
           oids,
-          timeout
+          timeout,
+          context
         )
 
       :get_next ->
@@ -583,8 +582,7 @@ defmodule SNMP do
           |> Enum.map(& &1.oid)
           |> normalize_to_oids
 
-        :snmpm.sync_get_next(
-          __MODULE__,
+        sync_get_next(
           target,
           context,
           oids,
@@ -602,13 +600,67 @@ defmodule SNMP do
             end
           end)
 
-        :snmpm.sync_set(
+        sync_set(target, context, vars_and_vals, timeout)
+    end
+  end
+
+  def sync_get(target, oids, timeout) do
+    sync_get(target, oids, timeout, "")
+  end
+  def sync_get(target, oids, timeout, context) do
+    if function_exported?(:snmpm, :sync_get2, 4) do
+        :snmpm.sync_get2(
+          __MODULE__,
+          target,
+          oids,
+          [{:timeout, timeout}, {:context, context}]
+        )
+    else
+        :snmpm.sync_get2(
           __MODULE__,
           target,
           context,
-          vars_and_vals,
+          oids,
           timeout
         )
+    end
+  end
+
+  defp sync_get_next(target, context, oids, timeout) do
+    if function_exported?(:snmpm, :sync_get_next2, 4) do
+      :snmpm.sync_get_next2(
+        __MODULE__,
+        target,
+        oids,
+        [{:timeout, timeout}, {:context, context}]
+      )
+    else
+      :snmpm.sync_get_next(
+        __MODULE__,
+        target,
+        context,
+        oids,
+        timeout
+      )
+    end
+  end
+
+  defp sync_set(target, context, vars_and_vals, timeout) do
+    if function_exported?(:snmpm, :sync_set2, 4) do
+      :snmpm.sync_set2(
+        __MODULE__,
+        target,
+        vars_and_vals,
+        [{:timeout, timeout}, {:context, context}]
+      )
+    else
+      :snmpm.sync_set(
+        __MODULE__,
+        target,
+        context,
+        vars_and_vals,
+        timeout
+      )
     end
   end
 
