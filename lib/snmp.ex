@@ -20,6 +20,87 @@ defmodule SNMP do
 
   require Logger
 
+  defmacrop sync_get(target, oids, timeout, context) do
+    with {:module, :snmpm} <- Code.ensure_loaded(:snmpm) do
+      if function_exported?(:snmpm, :sync_get2, 4) do
+        quote do
+          :snmpm.sync_get2(
+            __MODULE__,
+            unquote(target),
+            unquote(oids),
+            [ timeout: unquote(timeout),
+              context: unquote(context),
+            ]
+          )
+        end
+      else
+        quote do
+          :snmpm.sync_get(
+            __MODULE__,
+            unquote(target),
+            unquote(context),
+            unquote(oids),
+            unquote(timeout)
+          )
+        end
+      end
+    end
+  end
+
+  defmacrop sync_get_next(target, context, oids, timeout) do
+    with {:module, :snmpm} <- Code.ensure_loaded(:snmpm) do
+      if function_exported?(:snmpm, :sync_get_next2, 4) do
+        quote do
+          :snmpm.sync_get_next2(
+            __MODULE__,
+            unquote(target),
+            unquote(oids),
+            [ timeout: unquote(timeout),
+              context: unquote(context),
+            ]
+          )
+        end
+      else
+        quote do
+          :snmpm.sync_get_next(
+            __MODULE__,
+            unquote(target),
+            unquote(context),
+            unquote(oids),
+            unquote(timeout)
+          )
+        end
+      end
+    end
+  end
+
+  defmacrop sync_set(target, context, vars_and_vals, timeout) do
+    with {:module, :snmpm} <- Code.ensure_loaded(:snmpm) do
+      if function_exported?(:snmpm, :sync_set2, 4) do
+        quote do
+          :snmpm.sync_set2(
+            __MODULE__,
+            unquote(target),
+            unquote(vars_and_vals),
+            [ timeout: unquote(timeout),
+              context: unquote(context),
+            ]
+          )
+        end
+      else
+        quote do
+          :snmpm.sync_set(
+            __MODULE__,
+            unquote(target),
+            unquote(context),
+            unquote(vars_and_vals),
+            unquote(timeout)
+          )
+        end
+      end
+    end
+  end
+
   @type snmp_credential
     :: CommunityCredential.t()
      | USMCredential.t()
@@ -606,62 +687,6 @@ defmodule SNMP do
 
   def sync_get(target, oids, timeout) do
     sync_get(target, oids, timeout, "")
-  end
-  def sync_get(target, oids, timeout, context) do
-    if function_exported?(:snmpm, :sync_get2, 4) do
-        :snmpm.sync_get2(
-          __MODULE__,
-          target,
-          oids,
-          [{:timeout, timeout}, {:context, context}]
-        )
-    else
-        :snmpm.sync_get2(
-          __MODULE__,
-          target,
-          context,
-          oids,
-          timeout
-        )
-    end
-  end
-
-  defp sync_get_next(target, context, oids, timeout) do
-    if function_exported?(:snmpm, :sync_get_next2, 4) do
-      :snmpm.sync_get_next2(
-        __MODULE__,
-        target,
-        oids,
-        [{:timeout, timeout}, {:context, context}]
-      )
-    else
-      :snmpm.sync_get_next(
-        __MODULE__,
-        target,
-        context,
-        oids,
-        timeout
-      )
-    end
-  end
-
-  defp sync_set(target, context, vars_and_vals, timeout) do
-    if function_exported?(:snmpm, :sync_set2, 4) do
-      :snmpm.sync_set2(
-        __MODULE__,
-        target,
-        vars_and_vals,
-        [{:timeout, timeout}, {:context, context}]
-      )
-    else
-      :snmpm.sync_set(
-        __MODULE__,
-        target,
-        context,
-        vars_and_vals,
-        timeout
-      )
-    end
   end
 
   defp perform_snmp_op(

@@ -233,7 +233,7 @@ defmodule SNMP.Test do
 
       {:ok, [%{value: v}]} = before = SNMP.request(req)
 
-      {_, _, us} = :erlang.now
+      {_, _, us} = :erlang.timestamp()
 
       new_v = "test-#{us}"
 
@@ -267,7 +267,7 @@ defmodule SNMP.Test do
 
       {:ok, [%{value: v}]} = before = SNMP.request(req)
 
-      {_, _, us} = :erlang.now
+      {_, _, us} = :erlang.timestamp()
 
       new_v = "test-#{us}"
 

@@ -13,14 +13,13 @@ defmodule SNMP.Mixfile do
       dialyzer: [
         plt_add_apps: [
           :logger,
-          :snmp,
           :netaddr_ex,
+          :snmp,
         ],
         ignore_warnings: "dialyzer.ignore",
         flags: [
           :unmatched_returns,
           :error_handling,
-          :race_conditions,
           :underspecs,
         ],
       ],
@@ -29,6 +28,7 @@ defmodule SNMP.Mixfile do
 
   def application do
     [ extra_applications: [
+        :crypto,
         :logger,
         :snmp,
       ],
