@@ -101,13 +101,11 @@ defmodule SNMP do
     end
   end
 
-  @type snmp_credential
+  @type snmp_credential()
     :: CommunityCredential.t()
      | USMCredential.t()
 
   defmodule CommunityCredential do
-    @moduledoc false
-
     defstruct [
       version: :v1,
       sec_model: :v1,
@@ -123,8 +121,6 @@ defmodule SNMP do
   end
 
   defmodule USMCredential do
-    @moduledoc false
-
     defstruct [
       version:   :v3,
       sec_model: :usm,

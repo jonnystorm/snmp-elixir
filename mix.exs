@@ -49,7 +49,7 @@ defmodule SNMP.Mixfile do
 
   defp deps do
     [
-      {:ex_doc, "~> 0.19", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.29", only: :dev, runtime: false},
       {:netaddr_ex, "~> 1.0"},
     ]
   end
