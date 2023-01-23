@@ -947,7 +947,7 @@ defmodule SNMP do
       e in ArgumentError ->
         :ok = Logger.warn("Unhandled exception: did you forget to `SNMP.start`?")
 
-        reraise(e, System.stacktrace())
+        reraise(e, __STACKTRACE__)
     end
   end
 

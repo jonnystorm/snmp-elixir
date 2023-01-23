@@ -6,4 +6,4 @@ export PLT_FILENAME=elixir-${ELIXIR_VERSION}_${OTP_RELEASE}.plt
 export PLT_TESTNAME=dialyxir_erlang-${OTP_RELEASE}_elixir-${ELIXIR_VERSION}_deps-${MIX_ENV}.plt
 export PLT_LOCATION=_build/$MIX_ENV/$PLT_TESTNAME
 
-mix dialyzer --halt-exit-status
+mix dialyzer
