@@ -4,7 +4,7 @@ defmodule SNMP.Mixfile do
   def project do
     [ app: :snmp_ex,
       version: "0.4.0",
-      elixir: "~> 1.12",
+      elixir: "~> 1.7",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -50,7 +50,7 @@ defmodule SNMP.Mixfile do
   defp deps do
     [
       {:ex_doc, "~> 0.19", only: :dev, runtime: false},
-      {:netaddr_ex, "~> 1.3"},
+      {:netaddr_ex, "~> 1.0"},
     ]
   end
 
