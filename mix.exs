@@ -3,7 +3,7 @@ defmodule SNMP.Mixfile do
 
   def project do
     [ app: :snmp_ex,
-      version: "0.5.0",
+      version: "0.6.0",
       elixir: "~> 1.12",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,

@@ -892,7 +892,7 @@ defmodule SNMP do
   ) do
     [base_oid] = normalize_to_oids([object])
 
-    %{oid: base_oid ++ [0]}
+    %{oid: base_oid}
     |> Stream.iterate(fn %{oid: last_oid} ->
       %{uri: uri,
         credential: credential,
