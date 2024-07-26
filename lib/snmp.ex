@@ -578,6 +578,7 @@ defmodule SNMP do
   end
 
   defp warmup_engine_boots_and_engine_time(
+    %{sec_model: :usm} = _credential,
     engine_id,
     target_name
   ) do
@@ -593,6 +594,12 @@ defmodule SNMP do
 
     :ok
   end
+
+  defp warmup_engine_boots_and_engine_time(
+    _credential,
+    _engine_id,
+    _target_name
+  ), do: :ok
 
   defp sha_sum(string) when is_binary(string),
     do: :crypto.hash(:sha, string)
@@ -699,9 +706,12 @@ defmodule SNMP do
       |> :binary.bin_to_list()
 
     discover_fun = fn ->
-      case discover_engine_id(uri, target) do
-        {:ok,  eid} -> :binary.list_to_bin(eid)
-        {:error, _} -> Utility.local_engine_id()
+      with %{sec_model: :usm} <- credential,
+           {:ok, eid} <- discover_engine_id(uri, target) do
+        :binary.list_to_bin(eid)
+      else
+        _error ->
+          Utility.local_engine_id()
       end
     end
 
@@ -721,6 +731,7 @@ defmodule SNMP do
            ),
          :ok <-
            warmup_engine_boots_and_engine_time(
+             credential,
              engine_id,
              target
            )
@@ -945,7 +956,7 @@ defmodule SNMP do
         do: {:ok, oid}
     rescue
       e in ArgumentError ->
-        :ok = Logger.warn("Unhandled exception: did you forget to `SNMP.start`?")
+        :ok = Logger.warning("Unhandled exception: did you forget to `SNMP.start`?")
 
         reraise(e, __STACKTRACE__)
     end
