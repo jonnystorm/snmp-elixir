@@ -956,7 +956,7 @@ defmodule SNMP do
         do: {:ok, oid}
     rescue
       e in ArgumentError ->
-        :ok = Logger.warn("Unhandled exception: did you forget to `SNMP.start`?")
+        :ok = Logger.warning("Unhandled exception: did you forget to `SNMP.start`?")
 
         reraise(e, __STACKTRACE__)
     end

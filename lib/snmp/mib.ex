@@ -123,7 +123,7 @@ defmodule SNMP.MIB do
       {rfc, link} =
         get_obsolete_mib_rfc_tuple(mib_name)
 
-      :ok = Logger.warn("Compiling obsolete MIB #{inspect(mib_name)}... This may not work. Please see #{rfc} at #{link} for details")
+      :ok = Logger.warning("Compiling obsolete MIB #{inspect(mib_name)}... This may not work. Please see #{rfc} at #{link} for details")
     end
 
     case :snmpc.compile(erl_mib_file, options) do
