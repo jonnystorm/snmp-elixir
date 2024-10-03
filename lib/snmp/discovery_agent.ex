@@ -54,7 +54,7 @@ defmodule SNMP.DiscoveryAgent do
       &:snmpa_conf.write_notify_config/2,
     ]
     |> Enum.map(fn fun ->
-      :ok = fun.('#{agent_dir()}', [])
+      :ok = fun.(~c'#{agent_dir()}', [])
     end)
   end
 
@@ -80,7 +80,7 @@ defmodule SNMP.DiscoveryAgent do
       end
 
     write_fun =
-      &:snmpa_conf.write_agent_config('#{agent_dir()}', &1)
+      &:snmpa_conf.write_agent_config(~c'#{agent_dir()}', &1)
 
     init_engine_id =
       :binary.bin_to_list(SNMP.Utility.local_engine_id())
@@ -96,7 +96,7 @@ defmodule SNMP.DiscoveryAgent do
     |> do_seed_config(agent_opts, config_fun, write_fun)
 
     config =
-      :snmpa_conf.read_agent_config('#{agent_dir()}')
+      :snmpa_conf.read_agent_config(~c'#{agent_dir()}')
 
     :ok = Logger.info("SNMP agent.conf created - #{inspect(config)}")
   end
@@ -112,15 +112,15 @@ defmodule SNMP.DiscoveryAgent do
     write_fun =
       fn x ->
         :snmpa_conf.write_standard_config(
-          '#{agent_dir()}',
+          ~c'#{agent_dir()}',
           x
         )
       end
 
-    [ sysName: 'Discovery agent',
-      sysDescr: 'Discovery agent',
-      sysContact: '',
-      sysLocation: '',
+    [ sysName: ~c'Discovery agent',
+      sysDescr: ~c'Discovery agent',
+      sysContact: ~c'',
+      sysLocation: ~c'',
       sysObjectID: [3, 6, 1, 4, 1, 193, 19],
       sysServices: 72,
       snmpEnableAuthenTraps: :disabled,
@@ -132,7 +132,7 @@ defmodule SNMP.DiscoveryAgent do
     )
 
     config =
-      :snmpa_conf.read_standard_config('#{agent_dir()}')
+      :snmpa_conf.read_standard_config(~c'#{agent_dir()}')
 
     :ok = Logger.info("SNMP standard.conf created - #{inspect(config)}")
   end
@@ -146,9 +146,9 @@ defmodule SNMP.DiscoveryAgent do
           originating: [enable: true],
           terminating: [enable: true]
         ],
-        db_dir: '#{agent_dir()}/db',
+        db_dir: ~c'#{agent_dir()}/db',
         db_init_error: :create_db_and_dir,
-        config: [dir: '#{agent_dir()}'],
+        config: [dir: ~c'#{agent_dir()}'],
       ]
       |> :snmpa_supervisor.start_master_sup()
 
@@ -166,26 +166,26 @@ defmodule SNMP.DiscoveryAgent do
   def configure_discovery do
     {:ok, _} =
       :snmp_view_based_acm_mib.add_access(
-        'discovery_group',
-        '',
+        ~c'discovery_group',
+        ~c'',
         :usm,
         :noAuthNoPriv,
         :exact,
-        'discovery',
-        'discovery',
-        'discovery'
+        ~c'discovery',
+        ~c'discovery',
+        ~c'discovery'
       )
 
     {:ok, _} =
       :snmp_view_based_acm_mib.add_sec2group(
         :usm,
-        '',
-        'discovery_group'
+        ~c'',
+        ~c'discovery_group'
       )
 
     {:ok, _} =
       :snmp_view_based_acm_mib.add_view_tree_fam(
-        'discovery',
+        ~c'discovery',
         [1, 3, 6, 1],
         :included,
         :null
@@ -193,10 +193,10 @@ defmodule SNMP.DiscoveryAgent do
 
     {:ok, _} =
       :snmp_target_mib.add_params(
-        'discovery_params',
+        ~c'discovery_params',
         :v3,
         :usm,
-        '',
+        ~c'',
         :noAuthNoPriv
       )
   end
@@ -262,9 +262,9 @@ defmodule SNMP.DiscoveryAgent do
         {erl_ip_address, opts[:port]},
         timeout,
         opts[:retries],
-        '',
-        'discovery_params',
-        '',
+        ~c'',
+        ~c'discovery_params',
+        ~c'',
         [],
         2048
       )

@@ -20,7 +20,7 @@ defmodule SNMP.Utility.Test do
     adjacencies = %{:e => [], :b => [:d, :a], :c => [:a]}
 
     assert topological_sort(adjacencies) == [
-             [:b, :c, :e],
+             [:c, :b, :e],
              [:a, :d]
            ]
   end
@@ -36,7 +36,7 @@ defmodule SNMP.Utility.Test do
     adjacencies = %{:a => [:c], :b => [:a], :c => [:b]}
 
     assert_raise RuntimeError,
-                 "detected cycle in subset: [:a, :b, :c]",
+                 "detected cycle in subset: [:c, :a, :b]",
                  fn -> topological_sort(adjacencies) end
   end
 end
