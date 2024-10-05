@@ -185,9 +185,9 @@ defmodule SNMP do
     :ok =
       :snmp_config.write_manager_config(
         snmpm_conf_dir_erl,
-        '',
+        ~c'',
         port: 5000,
-        engine_id: 'mgrEngine',
+        engine_id: ~c'mgrEngine',
         max_message_size: 484
       )
 
@@ -302,8 +302,9 @@ defmodule SNMP do
   defp get_timeout,
     do: Application.get_env(:snmp_ex, :timeout)
 
-  defp get_max_repetitions,
-    do: Application.get_env(:snmp_ex, :max_repetitions)
+#  Temporarily commented.  Will uncomment when needed.
+#  defp get_max_repetitions,
+#    do: Application.get_env(:snmp_ex, :max_repetitions)
 
   defp get_delimiter_by_family(4), do: "."
   defp get_delimiter_by_family(6), do: ":"
@@ -969,19 +970,25 @@ defmodule SNMP do
   ## Example
 
       iex> SNMP.credential(%{community: "public"})
-      %SNMP.CommunityCredential{community: 'public'}
+      %SNMP.CommunityCredential{version: :v1, sec_model: :v1, community: ~c"public"}
 
       iex> SNMP.credential(
       ...>   %{version: :v2, community: "public"}
       ...> )
-      %SNMP.CommunityCredential{
-        version: :v2,
-        sec_model: :v2c,
-        community: 'public',
-      }
+      %SNMP.CommunityCredential{version: :v2, sec_model: :v2c, community: ~c"public"}
 
       iex> SNMP.credential(%{sec_name: "user"})
-      %SNMP.USMCredential{sec_name: 'user'}
+      %SNMP.USMCredential{
+        version: :v3,
+        sec_model: :usm,
+        sec_level: :noAuthNoPriv,
+        sec_name: ~c"user",
+        auth: :usmNoAuthProtocol,
+        auth_pass: nil,
+        priv: :usmNoPrivProtocol,
+        priv_pass: nil
+      }
+
 
       iex> SNMP.credential(
       ...>   %{sec_name: "user",
@@ -990,11 +997,16 @@ defmodule SNMP do
       ...>   }
       ...> )
       %SNMP.USMCredential{
-        sec_name: 'user',
+        version: :v3,
+        sec_model: :usm,
         sec_level: :authNoPriv,
+        sec_name: ~c"user",
         auth: :usmHMACSHAAuthProtocol,
-        auth_pass: 'authpass',
+        auth_pass: ~c"authpass",
+        priv: :usmNoPrivProtocol,
+        priv_pass: nil
       }
+
 
       iex> SNMP.credential(
       ...>   %{sec_name: "user",
@@ -1005,13 +1017,16 @@ defmodule SNMP do
       ...>   }
       ...> )
       %SNMP.USMCredential{
-        sec_name: 'user',
+        version: :v3,
+        sec_model: :usm,
         sec_level: :authPriv,
+        sec_name: ~c"user",
         auth: :usmHMACSHAAuthProtocol,
-        auth_pass: 'authpass',
+        auth_pass: ~c"authpass",
         priv: :usmAesCfb128Protocol,
-        priv_pass: 'privpass',
+        priv_pass: ~c"privpass"
       }
+
   """
   def credential(
     %{version: :v2,
