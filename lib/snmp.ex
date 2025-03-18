@@ -979,8 +979,8 @@ def bulkwalk(request, options \\ []) do
       walk(%{uri: uri, credential: credential, varbinds: [%{oid: object}]}, options)
 
     _ ->
-      # Start the recursive walk
-      perform_walk(uri, credential, base_oid, non_repeaters, max_repetitions, options, [], MapSet.new())
+      # Start the recursive walk - pass base_oid as a separate parameter that doesn't change
+      perform_walk(uri, credential, base_oid, base_oid, non_repeaters, max_repetitions, options, [], MapSet.new())
   end
 end
 
@@ -990,80 +990,141 @@ defp get_default_max_repetitions do
 end
 
 # Private recursive function that performs the actual walk
-defp perform_walk(uri, credential, current_oid, non_repeaters, max_repetitions, options, acc, seen_oids) do
+defp perform_walk(uri, credential, current_oid, base_oid, non_repeaters, max_repetitions, options, acc, seen_oids) do
   Logger.debug("SNMP bulkwalk: current_oid=#{inspect(current_oid)}")
-  case sync_get_bulk(uri, non_repeaters, max_repetitions, current_oid, get_timeout(), options) do
-    # Error case - return what we have so far
+
+  case _perform_bulk_op(uri, credential, [current_oid], non_repeaters, max_repetitions, options) do
     {:error, reason} ->
       Logger.debug("SNMP bulkwalk error: #{inspect(reason)}")
       Enum.reverse(acc)
 
-    # Success case - process results and potentially continue
-    {:ok, {_reply, _err_index, varbinds}, _remaining_time} ->
-      # Filter out endOfMibView markers and keep only results in our subtree
-      {valid_results, end_reached} = process_results(varbinds, current_oid)
+    {:ok, varbinds} ->
+      Logger.debug("Received #{length(varbinds)} varbinds")
 
-      if end_reached || Enum.empty?(valid_results) do
-        # We've reached the end - return accumulated results
-        Enum.reverse(acc ++ valid_results)
+      # IMPORTANT FIX: Get the next OID BEFORE filtering
+      next_oid = get_next_oid(varbinds)
+
+      # NEW CHECK: Is the next OID still in our subtree?
+      still_in_subtree = List.starts_with?(next_oid, base_oid)
+
+      # Then filter results for our accumulator
+      {valid_results, end_reached} = process_results(varbinds, base_oid)
+
+      Logger.debug("After filtering: #{length(valid_results)} valid results, end_reached=#{end_reached}")
+      Logger.debug("Next OID #{inspect(next_oid)} in subtree: #{still_in_subtree}")
+
+      # Add current batch to accumulator regardless of whether we're continuing or ending
+      new_acc = valid_results ++ acc
+
+      # If we've reached the end or there are no results, return accumulated results
+      if end_reached || Enum.empty?(valid_results) || !still_in_subtree do
+        new_acc
+        |> Enum.sort_by(& &1.oid)
       else
-        # Check for loops by examining if we've seen all these OIDs before
-        new_oids_set = MapSet.new(valid_results, & &1.oid)
+        # Use the next_oid we determined earlier (not from filtered results)
+        new_seen_oids = Enum.reduce(valid_results, seen_oids, fn %{oid: oid}, set -> MapSet.put(set, oid) end)
 
-        if MapSet.subset?(new_oids_set, seen_oids) do
-          # Loop detected - return what we have
-          Logger.debug("SNMP bulkwalk: Loop detected")
-          Enum.reverse(acc ++ valid_results)
-        else
-          # Continue the walk with the next OID
-          next_oid = get_next_oid(valid_results)
-          updated_seen = MapSet.union(seen_oids, new_oids_set)
-
-          # Recursive call with accumulated results
-          perform_walk(
-            uri,
-            credential,
-            next_oid,
-            non_repeaters,
-            max_repetitions,
-            options,
-            acc ++ valid_results,
-            updated_seen
-          )
-        end
+        perform_walk(uri, credential, next_oid, base_oid, non_repeaters, max_repetitions, options, new_acc, new_seen_oids)
       end
+  end
+end
+
+defp _perform_bulk_op(uri, credential, oids, non_repeaters, max_repetitions, options) do
+  Logger.debug("SNMP perform_bulk_op:")
+  Logger.debug("  OIDs: #{inspect(oids)}")
+  Logger.debug("  Non-repeaters: #{non_repeaters}")
+  Logger.debug("  Max-repetitions: #{max_repetitions}")
+
+  target = generate_target_name(uri, credential)
+  erl_context =
+    options
+    |> Keyword.get(:context, "")
+    |> :binary.bin_to_list()
+
+  discover_fun = fn ->
+    with %{sec_model: :usm} <- credential,
+         {:ok, eid} <- discover_engine_id(uri, target) do
+      :binary.list_to_bin(eid)
+    else
+      _error ->
+        Utility.local_engine_id()
     end
   end
 
-  # Helper function to process bulk results
-  defp process_results(varbinds, base_oid) do
-    # Convert SNMP varbinds to our internal format
-    formatted_varbinds = Enum.map(varbinds, fn {_error_index, oid, type, value, _orig_index} ->
-      %{oid: oid, type: type, value: value} |> groom_erl_varbind()
-    end)
+  engine_id =
+    options
+    |> Keyword.get_lazy(:engine_id, discover_fun)
+    |> :binary.bin_to_list()
 
-    # Split regular values from endOfMibView markers
-    {regular_results, end_markers} = Enum.split_with(formatted_varbinds, fn %{type: type} ->
-      type != :"END OF MIB VIEW" && type != :endOfMibView
-    end)
-
-    # Filter to results in the requested subtree
-    in_subtree = Enum.filter(regular_results, fn %{oid: oid} ->
-      List.starts_with?(oid, base_oid)
-    end)
-
-    # Determine if we've reached the end
-    end_reached = !Enum.empty?(end_markers) || Enum.empty?(in_subtree)
-
-    {in_subtree, end_reached}
+  result = with :ok <- register_usm_user(credential, engine_id),
+    :ok <- register_agent(target, uri, credential, engine_id),
+    :ok <- warmup_engine_boots_and_engine_time(credential, engine_id, target)
+  do
+    sync_get_bulk(target, non_repeaters, max_repetitions, oids, get_timeout(), erl_context)
   end
 
-  # Helper to get the next OID for continuation
-  defp get_next_oid(results) do
-    results
-    |> Enum.map(& &1.oid)
-    |> Enum.max()
+  case result do
+    {:error, {:invalid_oid, _}} = error ->
+      Logger.debug("SNMP: Invalid OID detected in request: #{inspect(error)}")
+      # Return empty result to allow the walk to continue with other OIDs
+      {:ok, []}
+
+    {:error, {:send_failed, _, :tooBig}} = error ->
+      # Handle tooBig error - this means we're requesting too much data at once
+      Logger.debug("SNMP: tooBig error received: #{inspect(error)}")
+      if max_repetitions > 1 do
+        # Try again with half the max_repetitions
+        new_max_rep = div(max_repetitions, 2)
+        Logger.debug("SNMP: Retrying with max_repetitions = #{new_max_rep}")
+        _perform_bulk_op(uri, credential, oids, non_repeaters, new_max_rep, options)
+      else
+        # If max_repetitions is already 1, we can't reduce further
+        {:error, :tooBig}
+      end
+
+    _ ->
+      groom_snmp_result(result)
   end
+end
+
+# Helper function to process bulk results
+defp process_results(varbinds, base_oid) do
+  Logger.debug("process_results - base_oid: #{inspect(base_oid)}")
+
+  {regular_results, end_markers} = Enum.split_with(varbinds, fn %{type: type} ->
+    type != :"END OF MIB VIEW" && type != :endOfMibView
+  end)
+
+  # Debug the OID comparisons
+  Enum.each(regular_results, fn %{oid: oid} ->
+    starts_with = List.starts_with?(oid, base_oid)
+    Logger.debug("  Checking if #{inspect(oid)} starts with #{inspect(base_oid)}: #{starts_with}")
+  end)
+
+  # Only consider end reached if ALL results are endOfMibView or none are in subtree
+  in_subtree = Enum.filter(regular_results, fn %{oid: oid} ->
+    List.starts_with?(oid, base_oid)
+  end)
+
+  # FIXED: End reached if EITHER:
+  # 1. There are no OIDs in our subtree
+  # 2. There are ANY endOfMibView markers
+  # 3. ANY OID is outside our subtree
+  any_outside_subtree =
+    Enum.any?(regular_results, fn %{oid: oid} -> !List.starts_with?(oid, base_oid) end)
+
+  end_reached = Enum.empty?(in_subtree) || !Enum.empty?(end_markers) || any_outside_subtree
+
+  {in_subtree, end_reached}
+end
+
+# Helper to get the next OID for continuation
+defp get_next_oid(results) do
+  # Use Elixir's built-in max_by function to find the largest OID
+  results
+  |> Enum.max_by(& &1.oid)
+  |> Map.get(:oid)
+end
 
   @type mib_name :: String.t()
 

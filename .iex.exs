@@ -20,7 +20,11 @@ defmodule Iex_SNMP do
   end
 
   def vb_ifx do
-    [%{oid: [1, 3, 6, 1, 2, 1, 31, 1, 1, 1]}]
+    [%{oid: [1, 3, 6, 1, 2, 1, 31, 1, 1]}]
+  end
+
+  def vb_ifx_name do
+    [%{oid: [1, 3, 6, 1, 2, 1, 31, 1, 1, 1, 1]}]
   end
 
   def get_request do
@@ -99,6 +103,11 @@ defmodule Iex_SNMP do
 
   def bulkwalk_ifx do
     SNMP.bulkwalk(%{uri: uri(), credential: creds(), varbinds: vb_ifx()}, [max_repetitions: 12])
+    |> Enum.to_list()
+  end
+
+  def bulkwalk_ifx_name do
+    SNMP.bulkwalk(%{uri: uri(), credential: creds(), varbinds: vb_ifx_name()}, [max_repetitions: 12])
     |> Enum.to_list()
   end
 
