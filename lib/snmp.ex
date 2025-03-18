@@ -101,6 +101,35 @@ defmodule SNMP do
     end
   end
 
+  defmacrop sync_get_bulk(target, non_repeaters, max_repetitions, oids, timeout, context) do
+    with {:module, :snmpm} <- Code.ensure_loaded(:snmpm) do
+      if function_exported?(:snmpm, :sync_get_bulk2, 5) do
+        quote do
+          :snmpm.sync_get_bulk2(
+            __MODULE__,
+            unquote(target),
+            unquote(non_repeaters),
+            unquote(max_repetitions),
+            unquote(oids),
+            [timeout: unquote(timeout), context: unquote(context)]
+          )
+        end
+      else
+        quote do
+          :snmpm.sync_get_bulk(
+            __MODULE__,
+            unquote(target),
+            unquote(context),
+            unquote(non_repeaters),
+            unquote(max_repetitions),
+            unquote(oids),
+            unquote(timeout)
+          )
+        end
+      end
+    end
+  end
+
   @type snmp_credential()
     :: CommunityCredential.t()
      | USMCredential.t()
@@ -186,9 +215,11 @@ defmodule SNMP do
       :snmp_config.write_manager_config(
         snmpm_conf_dir_erl,
         ~c'',
-        port: 5000,
-        engine_id: ~c'mgrEngine',
-        max_message_size: 484
+        [
+          {:port, 5000},
+          {:engine_id, ~c'mgrEngine'},
+          {:max_message_size, 484}
+        ]
       )
 
     snmpm_conf_dir =
@@ -918,6 +949,120 @@ defmodule SNMP do
       List.starts_with?(oid, base_oid)
     end)
     |> Stream.drop(1)
+  end
+
+  @doc """
+Performs a SNMP BULKWALK operation, efficiently retrieving a subtree of MIB objects.
+
+## Parameters
+- request: Map containing uri, credential, and varbinds
+- options: Keyword list of options including max_repetitions and timeout
+
+## Returns
+- List of varbinds in the requested subtree
+"""
+def bulkwalk(request, options \\ []) do
+  # Extract and validate required parameters
+  %{
+    uri: uri,
+    credential: credential,
+    varbinds: [%{oid: object} | _]
+  } = request
+
+  # Normalize OID and prepare options
+  [base_oid] = normalize_to_oids([object])
+  max_repetitions = Keyword.get(options, :max_repetitions, get_default_max_repetitions())
+  non_repeaters = Keyword.get(options, :non_repeaters, 0)
+
+  # Fall back to standard walk for SNMPv1
+  case credential do
+    %CommunityCredential{version: :v1} ->
+      walk(%{uri: uri, credential: credential, varbinds: [%{oid: object}]}, options)
+
+    _ ->
+      # Start the recursive walk
+      perform_walk(uri, credential, base_oid, non_repeaters, max_repetitions, options, [], MapSet.new())
+  end
+end
+
+# Default maximum repetitions for SNMP BULKWALK
+defp get_default_max_repetitions do
+  Application.get_env(:snmp_ex, :max_repetitions, 10)
+end
+
+# Private recursive function that performs the actual walk
+defp perform_walk(uri, credential, current_oid, non_repeaters, max_repetitions, options, acc, seen_oids) do
+  case sync_get_bulk(uri, non_repeaters, max_repetitions, [current_oid], get_timeout(), options) do
+    # Error case - return what we have so far
+    {:error, reason} ->
+      Logger.debug("SNMP bulkwalk error: #{inspect(reason)}")
+      Enum.reverse(acc)
+
+    # Success case - process results and potentially continue
+    {:ok, {_reply, _err_index, varbinds}, _remaining_time} ->
+      # Filter out endOfMibView markers and keep only results in our subtree
+      {valid_results, end_reached} = process_results(varbinds, current_oid)
+
+      if end_reached || Enum.empty?(valid_results) do
+        # We've reached the end - return accumulated results
+        Enum.reverse(acc ++ valid_results)
+      else
+        # Check for loops by examining if we've seen all these OIDs before
+        new_oids_set = MapSet.new(valid_results, & &1.oid)
+
+        if MapSet.subset?(new_oids_set, seen_oids) do
+          # Loop detected - return what we have
+          Logger.debug("SNMP bulkwalk: Loop detected")
+          Enum.reverse(acc ++ valid_results)
+        else
+          # Continue the walk with the next OID
+          next_oid = get_next_oid(valid_results)
+          updated_seen = MapSet.union(seen_oids, new_oids_set)
+
+          # Recursive call with accumulated results
+          perform_walk(
+            uri,
+            credential,
+            next_oid,
+            non_repeaters,
+            max_repetitions,
+            options,
+            acc ++ valid_results,
+            updated_seen
+          )
+        end
+      end
+    end
+  end
+
+  # Helper function to process bulk results
+  defp process_results(varbinds, base_oid) do
+    # Convert SNMP varbinds to our internal format
+    formatted_varbinds = Enum.map(varbinds, fn {_error_index, oid, type, value, _orig_index} ->
+      %{oid: oid, type: type, value: value} |> groom_erl_varbind()
+    end)
+
+    # Split regular values from endOfMibView markers
+    {regular_results, end_markers} = Enum.split_with(formatted_varbinds, fn %{type: type} ->
+      type != :"END OF MIB VIEW" && type != :endOfMibView
+    end)
+
+    # Filter to results in the requested subtree
+    in_subtree = Enum.filter(regular_results, fn %{oid: oid} ->
+      List.starts_with?(oid, base_oid)
+    end)
+
+    # Determine if we've reached the end
+    end_reached = !Enum.empty?(end_markers) || Enum.empty?(in_subtree)
+
+    {in_subtree, end_reached}
+  end
+
+  # Helper to get the next OID for continuation
+  defp get_next_oid(results) do
+    results
+    |> Enum.map(& &1.oid)
+    |> Enum.max()
   end
 
   @type mib_name :: String.t()
