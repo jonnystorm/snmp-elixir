@@ -211,16 +211,15 @@ defmodule SNMP do
     snmpm_conf_dir_erl =
       :binary.bin_to_list(snmpm_conf_dir)
 
-    :ok =
-      :snmp_config.write_manager_config(
-        snmpm_conf_dir_erl,
-        ~c'',
-        [
-          {:port, 5000},
-          {:engine_id, ~c'mgrEngine'},
-          {:max_message_size, 484}
-        ]
-      )
+      :ok =
+        :snmpm_conf.write_manager_config(
+          snmpm_conf_dir_erl,
+          [
+            :snmpm_conf.manager_entry(:max_message_size, 484),
+            :snmpm_conf.manager_entry(:port, 5000),
+            :snmpm_conf.manager_entry(:engine_id, ~c'mgrEngine')
+          ]
+        )
 
     snmpm_conf_dir =
       Application.get_env(:snmp_ex, :snmpm_conf_dir)
