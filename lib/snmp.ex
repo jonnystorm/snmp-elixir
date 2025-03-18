@@ -970,6 +970,7 @@ def bulkwalk(request, options \\ []) do
 
   # Normalize OID and prepare options
   [base_oid] = normalize_to_oids([object])
+  Logger.debug("SNMP bulkwalk: base_oid=#{inspect(base_oid)}")
   max_repetitions = Keyword.get(options, :max_repetitions, get_default_max_repetitions())
   non_repeaters = Keyword.get(options, :non_repeaters, 0)
 
@@ -994,6 +995,10 @@ defp perform_walk(uri, credential, current_oid, base_oid, non_repeaters, max_rep
   Logger.debug("SNMP bulkwalk: current_oid=#{inspect(current_oid)}")
 
   case _perform_bulk_op(uri, credential, [current_oid], non_repeaters, max_repetitions, options) do
+    {:error, :etimedout} ->
+      Logger.warning("SNMP bulkwalk timeout, returning results so far")
+      acc |> Enum.sort_by(& &1.oid)
+
     {:error, reason} ->
       Logger.debug("SNMP bulkwalk error: #{inspect(reason)}")
       Enum.reverse(acc)
@@ -1091,18 +1096,24 @@ end
 defp process_results(varbinds, base_oid) do
   Logger.debug("process_results - base_oid: #{inspect(base_oid)}")
 
-  {regular_results, end_markers} = Enum.split_with(varbinds, fn %{type: type} ->
-    type != :"END OF MIB VIEW" && type != :endOfMibView
-  end)
+  # {regular_results, end_markers} = Enum.split_with(varbinds, fn %{type: type} ->
+  #   type != :endOfMibView
+  # end)
+  IO.puts "Processing results:"
+  IO.inspect(varbinds)
+  end_markers = Enum.filter(varbinds, fn %{value: value} -> value == :endOfMibView end)
+
+  IO.puts "Found the following end_markers"
+  IO.inspect(end_markers)
 
   # Debug the OID comparisons
-  Enum.each(regular_results, fn %{oid: oid} ->
+  Enum.each(varbinds, fn %{oid: oid} ->
     starts_with = List.starts_with?(oid, base_oid)
     Logger.debug("  Checking if #{inspect(oid)} starts with #{inspect(base_oid)}: #{starts_with}")
   end)
 
   # Only consider end reached if ALL results are endOfMibView or none are in subtree
-  in_subtree = Enum.filter(regular_results, fn %{oid: oid} ->
+  in_subtree = Enum.filter(varbinds, fn %{oid: oid} ->
     List.starts_with?(oid, base_oid)
   end)
 
@@ -1111,7 +1122,7 @@ defp process_results(varbinds, base_oid) do
   # 2. There are ANY endOfMibView markers
   # 3. ANY OID is outside our subtree
   any_outside_subtree =
-    Enum.any?(regular_results, fn %{oid: oid} -> !List.starts_with?(oid, base_oid) end)
+    Enum.any?(varbinds, fn %{oid: oid} -> !List.starts_with?(oid, base_oid) end)
 
   end_reached = Enum.empty?(in_subtree) || !Enum.empty?(end_markers) || any_outside_subtree
 

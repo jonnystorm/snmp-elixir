@@ -96,6 +96,16 @@ defmodule Iex_SNMP do
     |> Enum.to_list()
   end
 
+  def bulkwalk_all do
+    SNMP.bulkwalk(%{uri: uri(), credential: creds(), varbinds: []}, [max_repetitions: 12])
+    |> Enum.to_list()
+  end
+
+  def bulkwalk_test(varbinds) do
+    SNMP.bulkwalk(%{uri: uri(), credential: creds(), varbinds: varbinds}, [max_repetitions: 12])
+    |> Enum.to_list()
+  end
+
   def bulkwalk_if do
     SNMP.bulkwalk(%{uri: uri(), credential: creds(), varbinds: vb_if()}, [max_repetitions: 12])
     |> Enum.to_list()
@@ -119,5 +129,53 @@ defmodule Iex_SNMP do
   def bulkwalk_bigpacket do
     SNMP.bulkwalk(%{uri: uri(), credential: creds(), varbinds: vb_ifx()}, [max_repetitions: 50, timeout: 20000])
     |> Enum.to_list()
+  end
+
+  def output_results(results) do
+    results
+    # |> Enum.map(fn {_, result} -> result end)
+    |> Enum.each(fn result -> IO.puts(
+      "#{format_oid(result.oid)} = #{result.type}: #{format_value(result.type, result.value)}") end)
+    # |> Enum.each(fn result -> IO.inspect(result) end)
+  end
+
+  def format_oid(oid) when is_list(oid) do
+    "." <> Enum.join(oid, ".")
+  end
+
+  def format_value(:"OCTET STRING", value) when is_binary(value) do
+    # For potentially non-printable binaries, use inspect with limit: :infinity
+    # to see the full binary representation
+    inspect(value, limit: :infinity, printable_limit: :infinity)
+  end
+
+  # def format_value(:"OCTET STRING", value) when is_list(value) do
+  #   # For char lists, try to convert to string when possible
+  #   try do
+  #     List.to_string(value)
+  #   rescue
+  #     _ -> inspect(value)
+  #   end
+  # end
+
+  def format_value(type, value) when type == :"OBJECT IDENTIFIER" do
+    format_oid(value)
+  end
+
+  #def format_value(:INTEGER, value), do: to_string(value)
+
+  # def format_value(:"Counter32", value), do: to_string(value)
+  # def format_value(:"Counter64", value), do: to_string(value)
+  # def format_value(:"Gauge32", value), do: to_string(value)
+  # def format_value(:"TimeTicks", value), do: to_string(value)
+
+  # Fallback for all other types
+  def format_value(_type, value) do
+    inspect(value)
+  end
+
+  def bulkwalk_output do
+    bulkwalk_test([%{oid: [1, 3, 6, 1]}])
+    |> output_results()
   end
 end
