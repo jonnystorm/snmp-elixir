@@ -991,7 +991,8 @@ end
 
 # Private recursive function that performs the actual walk
 defp perform_walk(uri, credential, current_oid, non_repeaters, max_repetitions, options, acc, seen_oids) do
-  case sync_get_bulk(uri, non_repeaters, max_repetitions, [current_oid], get_timeout(), options) do
+  Logger.debug("SNMP bulkwalk: current_oid=#{inspect(current_oid)}")
+  case sync_get_bulk(uri, non_repeaters, max_repetitions, current_oid, get_timeout(), options) do
     # Error case - return what we have so far
     {:error, reason} ->
       Logger.debug("SNMP bulkwalk error: #{inspect(reason)}")

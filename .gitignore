@@ -22,6 +22,7 @@ erl_crash.dump
 # Ignore hidden and swap files
 .*
 !.gitkeep
+!.iex.exs
 *~
 
 # Ignore snmp state
