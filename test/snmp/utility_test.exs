@@ -45,7 +45,11 @@ defmodule SNMP.Utility.Test do
             |> String.replace("detected cycle in subset: ", "")
             |> String.replace(~r/[\[\]]/, "")
             |> String.split(", ")
-            |> Enum.map(&String.to_atom/1)
+            |> Enum.map(fn s ->
+              s
+              |> String.replace(":", "")
+              |> String.to_atom()
+            end)
             |> Enum.sort()
 
     assert cycle == [:a, :b, :c]
