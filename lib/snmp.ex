@@ -1099,12 +1099,9 @@ defp process_results(varbinds, base_oid) do
   # {regular_results, end_markers} = Enum.split_with(varbinds, fn %{type: type} ->
   #   type != :endOfMibView
   # end)
-  IO.puts "Processing results:"
-  IO.inspect(varbinds)
+  # IO.puts "Processing results:"
+  # IO.inspect(varbinds)
   end_markers = Enum.filter(varbinds, fn %{value: value} -> value == :endOfMibView end)
-
-  IO.puts "Found the following end_markers"
-  IO.inspect(end_markers)
 
   # Debug the OID comparisons
   Enum.each(varbinds, fn %{oid: oid} ->
