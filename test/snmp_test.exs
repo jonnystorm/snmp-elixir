@@ -286,4 +286,76 @@ defmodule SNMP.Test do
       |> SNMP.request
     end
   end
+
+  describe "bulkwalk" do
+    test "walks system subtree successfully" do
+      result = %{
+        uri: URI.parse("snmp://#{get_working_agent()}"),
+        credential: SNMP.credential(%{version: :v2, community: "public"}),
+        varbinds: [%{oid: [1, 3, 6, 1, 2, 1, 1]}]  # system subtree
+      }
+      |> SNMP.bulkwalk()
+      |> Enum.to_list()
+
+      assert length(result) > 0
+      # Verify all results are in the system subtree
+      assert Enum.all?(result, fn %{oid: oid} ->
+        List.starts_with?(oid, [1, 3, 6, 1, 2, 1, 1])
+      end)
+    end
+
+    test "handles endOfMibView correctly" do
+      result = %{
+        uri: URI.parse("snmp://#{get_working_agent()}"),
+        credential: SNMP.credential(%{version: :v2, community: "public"}),
+        varbinds: [%{oid: [1, 3, 6, 1, 2, 1, 1, 9999]}]  # Non-existent OID
+      }
+      |> SNMP.bulkwalk()
+      |> Enum.to_list()
+
+      assert result == []
+    end
+
+    test "respects max_repetitions option" do
+      request = %{
+        uri: URI.parse("snmp://#{get_working_agent()}"),
+        credential: SNMP.credential(%{version: :v2, community: "public"}),
+        varbinds: [%{oid: [1, 3, 6, 1, 2, 1, 2, 2, 1]}]  # interfaces table
+      }
+
+      result1 = SNMP.bulkwalk(request, max_repetitions: 1)
+      result2 = SNMP.bulkwalk(request, max_repetitions: 10)
+
+      # Both should return the same total results
+      assert Enum.count(result1) == Enum.count(result2)
+    end
+
+    test "falls back to walk for SNMPv1" do
+      result = %{
+        uri: URI.parse("snmp://#{get_working_agent()}"),
+        credential: SNMP.credential(%{community: "public"}),  # v1 by default
+        varbinds: [%{oid: [1, 3, 6, 1, 2, 1, 1]}]
+      }
+      |> SNMP.bulkwalk()
+      |> Enum.to_list()
+
+      assert length(result) > 0
+      # Verify all results are in the system subtree
+      assert Enum.all?(result, fn %{oid: oid} ->
+        List.starts_with?(oid, [1, 3, 6, 1, 2, 1, 1])
+      end)
+    end
+
+    test "handles timeouts gracefully" do
+      result = %{
+        uri: URI.parse("snmp://#{@borking_agent}"),
+        credential: SNMP.credential(%{version: :v2, community: "public"}),
+        varbinds: [%{oid: [1, 3, 6, 1, 2, 1, 1]}]
+      }
+      |> SNMP.bulkwalk()
+      |> Enum.to_list()
+
+      assert result == []
+    end
+  end
 end
