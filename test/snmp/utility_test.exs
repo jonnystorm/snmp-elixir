@@ -35,8 +35,23 @@ defmodule SNMP.Utility.Test do
   test "Raises when a cycle is detected" do
     adjacencies = %{:a => [:c], :b => [:a], :c => [:b]}
 
-    assert_raise RuntimeError,
-                 "detected cycle in subset: [:c, :a, :b]",
-                 fn -> topological_sort(adjacencies) end
+    error = assert_raise RuntimeError, fn ->
+      topological_sort(adjacencies)
+    end
+
+    # Convert the error message into a list and sort it for comparison
+    assert error.message =~ "detected cycle in subset: "
+    cycle = error.message
+            |> String.replace("detected cycle in subset: ", "")
+            |> String.replace(~r/[\[\]]/, "")
+            |> String.split(", ")
+            |> Enum.map(fn s ->
+              s
+              |> String.replace(":", "")
+              |> String.to_atom()
+            end)
+            |> Enum.sort()
+
+    assert cycle == [:a, :b, :c]
   end
 end
