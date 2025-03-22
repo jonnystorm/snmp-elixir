@@ -19,9 +19,17 @@ defmodule SNMP.Utility.Test do
   """ do
     adjacencies = %{:e => [], :b => [:d, :a], :c => [:a]}
 
-    assert topological_sort(adjacencies) == [
-             [:c, :b, :e],
-             [:a, :d]
+    # Since `topological_sort` does not guarantee an order
+    # on elements of antichains (which are, by definition,
+    # without order), we sort them, here, for convenience.
+    sorted_antichains =
+      adjacencies
+      |> topological_sort
+      |> Enum.map(&Enum.sort/1)
+
+    assert sorted_antichains == [
+             [:b, :c, :e],
+             [:a, :d],
            ]
   end
 
@@ -35,23 +43,13 @@ defmodule SNMP.Utility.Test do
   test "Raises when a cycle is detected" do
     adjacencies = %{:a => [:c], :b => [:a], :c => [:b]}
 
-    error = assert_raise RuntimeError, fn ->
-      topological_sort(adjacencies)
-    end
+    # Again, the indifference of `topological sort` to tests
+    # causes us some difficulties, here. Should we ever wish
+    # to test for cycles of length greater than 3, the
+    # result of `topological_sort` should itself be revised.
+    assert_raise RuntimeError,
+      ~r"^detected cycle in subset: \[(:a, :b, :c|:b, :c, :a|:c, :a, :b)\]$",
+      fn -> topological_sort(adjacencies) end
 
-    # Convert the error message into a list and sort it for comparison
-    assert error.message =~ "detected cycle in subset: "
-    cycle = error.message
-            |> String.replace("detected cycle in subset: ", "")
-            |> String.replace(~r/[\[\]]/, "")
-            |> String.split(", ")
-            |> Enum.map(fn s ->
-              s
-              |> String.replace(":", "")
-              |> String.to_atom()
-            end)
-            |> Enum.sort()
-
-    assert cycle == [:a, :b, :c]
   end
 end
