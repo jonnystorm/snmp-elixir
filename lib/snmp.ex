@@ -1114,6 +1114,10 @@ defp process_results(varbinds, base_oid) do
     List.starts_with?(oid, base_oid)
   end)
 
+  # Filter any results with NULL in the type field or endOfMibView in value
+  in_subtree = Enum.filter(in_subtree, fn %{type: type} -> type != :NULL end)
+  in_subtree = Enum.filter(in_subtree, fn %{value: value} -> value != :endOfMibView end)
+
   # FIXED: End reached if EITHER:
   # 1. There are no OIDs in our subtree
   # 2. There are ANY endOfMibView markers

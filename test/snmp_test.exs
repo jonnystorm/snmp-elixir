@@ -358,4 +358,20 @@ defmodule SNMP.Test do
       assert result == []
     end
   end
+
+  test "bulkwalk results filter endOfMibView and NULL for type from results" do
+    result = %{
+      uri: URI.parse("snmp://#{get_working_agent()}"),
+      credential: SNMP.credential(%{version: :v2, community: "public"}),
+      varbinds: [%{oid: [1, 3, 6, 1, 2, 1, 1]}]  # system subtree
+    }
+    |> SNMP.bulkwalk()
+    |> Enum.to_list()
+
+    assert length(result) > 0
+    # verify no result has NULL as the type
+    assert Enum.all?(result, fn %{type: type} -> type != :NULL end)
+    # verify no reuslt has endOfMibView as the value
+    assert Enum.all?(result, fn %{value: value} -> value != :endOfMibView end)
+  end
 end
