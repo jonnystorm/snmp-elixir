@@ -217,7 +217,15 @@ defmodule SNMP.DiscoveryAgent do
 
     msg = {:discover_engine_id, uri, clean_opts}
 
-    GenServer.call(__MODULE__, msg, 60_000)
+    try do
+      GenServer.call(__MODULE__, msg, 60_000)
+    catch
+      :exit, {:timeout, _} ->
+        {:error, :timeout}
+
+      :exit, reason ->
+        {:error, reason}
+    end
   end
 
   def handle_call(
