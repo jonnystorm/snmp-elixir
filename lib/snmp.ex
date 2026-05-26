@@ -608,6 +608,14 @@ defmodule SNMP do
     end
   end
 
+  defp is_engine_warm(engine_id) do
+    {:ok, engine_boots} = :snmpm_config.get_usm_eboots(engine_id)
+    case engine_boots do
+      0 -> {:error, :engine_not_warm}
+      _ -> {:ok}
+    end
+  end
+
   defp warmup_engine_boots_and_engine_time(
     %{sec_model: :usm} = _credential,
     engine_id,
@@ -762,21 +770,30 @@ defmodule SNMP do
     end
   end
 
-  def perform_snmp_op_short(
+  def perform_snmp_op(
     op,
     varbinds,
+    target_name,
+    engine_id,
+    user_id,
+    username,
     options
   )
   do
-    result =
-      _perform_snmp_op(
-        op,
-        varbinds,
-        target,
-        erl_context,
-        get_timeout()
-      )
-    groom_snmp_result(result)
+    with {:ok, ^username} <- :snmpm_config.usm_user_info(engine_id, username, :sec_name),
+      {:ok, ^engine_id} <- :snmpm.agent_info(target_name, :engine_id),
+      {:ok} <- is_engine_warm(engine_id)
+    do
+      result =
+        _perform_snmp_op(
+          op,
+          varbinds,
+          target,
+          erl_context,
+          get_timeout()
+        )
+      groom_snmp_result(result)
+    end
   end
 
   defp perform_snmp_op(
@@ -960,9 +977,18 @@ defmodule SNMP do
     end
   end
 
-  @spec request_short(req_params, req_options)
+  @spec request(req_params, req_options)
     :: request_result
-  def request_short(varbinds) when is_list(varbinds) do
+  def request(
+    %{uri: %{scheme: _, host: _, port: _} = uri,
+      credential: credential,
+      varbinds: varbinds,
+    },
+    target_name,
+    engine_id,
+    user_id,
+    username
+  ) when is_list(varbinds) do
     with op when not is_nil(op) <-
       ( cond do
           Enum.all?(
@@ -987,9 +1013,13 @@ defmodule SNMP do
         end
       )
     do
-      perform_snmp_op_short(
+      perform_snmp_op(
         op,
-        varbinds
+        varbinds,
+        target_name,
+        engine_id,
+        user_id,
+        username
       )
     end
   end
@@ -1040,6 +1070,37 @@ defmodule SNMP do
     |> Stream.drop(1)
   end
 
+  @spec walk(req_params, req_options)
+    :: Enumerable.t
+  def walk(
+    %{uri: uri,
+      credential: credential,
+      varbinds: [%{oid: object}|_],
+    },
+    target_name,
+    engine_id,
+    user_id,
+    username,
+    options \\ []
+  ) do
+    [base_oid] = normalize_to_oids([object])
+
+    %{oid: base_oid}
+    |> Stream.iterate(fn %{oid: last_oid} ->
+      %{uri: uri,
+        credential: credential,
+        varbinds: [%{oid: last_oid, type: :next}]
+      }
+      |> request(target_name, engine_id, user_id, username, options)
+      |> elem(1)
+      |> List.first
+    end)
+    |> Stream.take_while(fn %{oid: oid} ->
+      List.starts_with?(oid, base_oid)
+    end)
+    |> Stream.drop(1)
+  end
+
   @doc """
   Performs a SNMP BULKWALK operation, efficiently retrieving a subtree of MIB objects.
 
@@ -1074,6 +1135,40 @@ defmodule SNMP do
       _ ->
         # Start the recursive walk - pass base_oid as a separate parameter that doesn't change
         perform_walk(uri, credential, base_oid, base_oid, non_repeaters, max_repetitions, options, [], MapSet.new())
+    end
+  end
+
+  @spec bulkwalk(req_params, req_options)
+    :: Enumerable.t
+  def bulkwalk(
+    request,
+    target_name,
+    engine_id,
+    user_id,
+    username,
+    options \\ []
+  ) do
+    # Extract and validate required parameters
+    %{
+      uri: uri,
+      credential: credential,
+      varbinds: [%{oid: object} | _]
+    } = request
+
+    # Normalize OID and prepare options
+    [base_oid] = normalize_to_oids([object])
+    Logger.debug("SNMP bulkwalk: base_oid=#{inspect(base_oid)}")
+    max_repetitions = Keyword.get(options, :max_repetitions, get_default_max_repetitions())
+    non_repeaters = Keyword.get(options, :non_repeaters, 0)
+
+    # Fall back to standard walk for SNMPv1
+    case credential do
+      %CommunityCredential{version: :v1} ->
+        walk(%{uri: uri, credential: credential, varbinds: [%{oid: object}]}, options)
+
+      _ ->
+        # Start the recursive walk - pass base_oid as a separate parameter that doesn't change
+        perform_walk(uri, credential, base_oid, base_oid, non_repeaters, max_repetitions, options, [], MapSet.new(), target_name, engine_id, user_id, username)
     end
   end
 
@@ -1126,6 +1221,49 @@ defmodule SNMP do
     end
   end
 
+  defp perform_walk(uri, credential, current_oid, base_oid, non_repeaters, max_repetitions, options, acc, seen_oids, target_name, engine_id, user_id, username) do
+    Logger.debug("SNMP bulkwalk: current_oid=#{inspect(current_oid)}")
+
+    case _perform_bulk_op(uri, credential, [current_oid], non_repeaters, max_repetitions, options, target_name, engine_id, user_id, username) do
+      {:error, :etimedout} ->
+        Logger.warning("SNMP bulkwalk timeout, returning results so far")
+        acc |> Enum.sort_by(& &1.oid)
+
+      {:error, reason} ->
+        Logger.debug("SNMP bulkwalk error: #{inspect(reason)}")
+        Enum.reverse(acc)
+
+      {:ok, varbinds} ->
+        Logger.debug("Received #{length(varbinds)} varbinds")
+
+        # IMPORTANT FIX: Get the next OID BEFORE filtering
+        next_oid = get_next_oid(varbinds)
+
+        # NEW CHECK: Is the next OID still in our subtree?
+        still_in_subtree = List.starts_with?(next_oid, base_oid)
+
+        # Then filter results for our accumulator
+        {valid_results, end_reached} = process_results(varbinds, base_oid)
+
+        Logger.debug("After filtering: #{length(valid_results)} valid results, end_reached=#{end_reached}")
+        Logger.debug("Next OID #{inspect(next_oid)} in subtree: #{still_in_subtree}")
+
+        # Add current batch to accumulator regardless of whether we're continuing or ending
+        new_acc = valid_results ++ acc
+
+        # If we've reached the end or there are no results, return accumulated results
+        if end_reached || Enum.empty?(valid_results) || !still_in_subtree do
+          new_acc
+          |> Enum.sort_by(& &1.oid)
+        else
+          # Use the next_oid we determined earlier (not from filtered results)
+          new_seen_oids = Enum.reduce(valid_results, seen_oids, fn %{oid: oid}, set -> MapSet.put(set, oid) end)
+
+          perform_walk(uri, credential, next_oid, base_oid, non_repeaters, max_repetitions, options, new_acc, new_seen_oids, target_name, engine_id, user_id, username)
+        end
+    end
+  end
+
   defp _perform_bulk_op(uri, credential, oids, non_repeaters, max_repetitions, options) do
     Logger.debug("SNMP perform_bulk_op:")
     Logger.debug("  OIDs: #{inspect(oids)}")
@@ -1174,6 +1312,43 @@ defmodule SNMP do
           new_max_rep = div(max_repetitions, 2)
           Logger.debug("SNMP: Retrying with max_repetitions = #{new_max_rep}")
           _perform_bulk_op(uri, credential, oids, non_repeaters, new_max_rep, options)
+        else
+          # If max_repetitions is already 1, we can't reduce further
+          {:error, :tooBig}
+        end
+
+      _ ->
+        groom_snmp_result(result)
+    end
+  end
+
+  defp _perform_bulk_op(uri, credential, oids, non_repeaters, max_repetitions, options, target_name, engine_id, user_id, username) do
+    Logger.debug("SNMP perform_bulk_op:")
+    Logger.debug("  OIDs: #{inspect(oids)}")
+    Logger.debug("  Non-repeaters: #{non_repeaters}")
+    Logger.debug("  Max-repetitions: #{max_repetitions}")
+
+    result = with {:ok, ^username} <- :snmpm_config.usm_user_info(engine_id, username, :sec_name),
+      {:ok, ^engine_id} <- :snmpm.agent_info(target_name, :engine_id),
+      {:ok} <- is_engine_warm(engine_id)
+    do
+      sync_get_bulk(target, non_repeaters, max_repetitions, oids, get_timeout(), erl_context)
+    end
+
+    case result do
+      {:error, {:invalid_oid, _}} = error ->
+        Logger.debug("SNMP: Invalid OID detected in request: #{inspect(error)}")
+        # Return empty result to allow the walk to continue with other OIDs
+        {:ok, []}
+
+      {:error, {:send_failed, _, :tooBig}} = error ->
+        # Handle tooBig error - this means we're requesting too much data at once
+        Logger.debug("SNMP: tooBig error received: #{inspect(error)}")
+        if max_repetitions > 1 do
+          # Try again with half the max_repetitions
+          new_max_rep = div(max_repetitions, 2)
+          Logger.debug("SNMP: Retrying with max_repetitions = #{new_max_rep}")
+          _perform_bulk_op(uri, credential, oids, non_repeaters, new_max_rep, options, target_name, engine_id, user_id, username)
         else
           # If max_repetitions is already 1, we can't reduce further
           {:error, :tooBig}
