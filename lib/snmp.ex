@@ -723,6 +723,62 @@ defmodule SNMP do
     sync_get(target, oids, timeout, "")
   end
 
+  def prepare_snmp(
+    uri,
+    credential,
+    options \\ []
+  ) do
+    {:ok, ip_uri} <- resolve_host_in_uri(uri)
+    target = generate_target_name(uri, credential)
+    erl_context =
+      options
+      |> Keyword.get(:context, "")
+      |> :binary.bin_to_list()
+
+    discover_fun = fn ->
+      with %{sec_model: :usm} <- credential,
+           {:ok, eid} <- discover_engine_id(ip_uri, target) do
+        :binary.list_to_bin(eid)
+      else
+        _error ->
+          Utility.local_engine_id()
+      end
+    end
+
+    engine_id =
+      options
+      |> Keyword.get_lazy(:engine_id, discover_fun)
+      |> :binary.bin_to_list()
+
+    with :ok <- register_usm_user(credential, engine_id),
+      :ok <- register_agent(target, ip_uri, credential, engine_id),
+      :ok <- warmup_engine_boots_and_engine_time(credential, engine_id, target)
+    do
+      {:ok, %{
+        target_name: target,
+        engine_id: engine_id,
+        user_id: :snmpm_config.get_agent_user_id(target)
+      }}
+    end
+  end
+
+  def perform_snmp_op_short(
+    op,
+    varbinds,
+    options
+  )
+  do
+    result =
+      _perform_snmp_op(
+        op,
+        varbinds,
+        target,
+        erl_context,
+        get_timeout()
+      )
+    groom_snmp_result(result)
+  end
+
   defp perform_snmp_op(
     op,
     varbinds,
@@ -900,6 +956,40 @@ defmodule SNMP do
         ip_uri,
         credential,
         options
+      )
+    end
+  end
+
+  @spec request_short(req_params, req_options)
+    :: request_result
+  def request_short(varbinds) when is_list(varbinds) do
+    with op when not is_nil(op) <-
+      ( cond do
+          Enum.all?(
+            varbinds,
+            & &1[:oid] && &1[:value]
+          ) ->
+            :set
+
+          Enum.all?(
+            varbinds,
+            & &1[:oid] && (&1[:type] == :next)
+          ) ->
+            :get_next
+
+          Enum.all?(varbinds, & &1[:oid]) ->
+            :get
+
+          true ->
+            :ok = Logger.error("Request contains unacceptable varbinds: #{inspect(varbinds)}")
+
+            {:error, :einval}
+        end
+      )
+    do
+      perform_snmp_op_short(
+        op,
+        varbinds
       )
     end
   end
